@@ -11,6 +11,7 @@ import {
   ScrollView,
   Dimensions,
   Alert,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,18 +20,38 @@ import { StatusBar } from 'expo-status-bar';
 
 const { height, width } = Dimensions.get('window');
 
+const COUNTRIES = [
+  { code: '+998', flag: '🇺🇿', name: 'O\'zbekiston' },
+  { code: '+1', flag: '🇺🇸', name: 'United States' },
+  { code: '+7', flag: '🇷🇺', name: 'Russia' },
+  { code: '+7', flag: '🇰🇿', name: 'Kazakhstan' },
+  { code: '+996', flag: '🇰🇬', name: 'Kyrgyzstan' },
+  { code: '+90', flag: '🇹🇷', name: 'Turkey' },
+  { code: '+44', flag: '🇬🇧', name: 'United Kingdom' },
+];
+
 export default function RegisterScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [countryCode, setCountryCode] = useState('+1');
+  const [password, setPassword] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]); // Default to Uzbekistan
+  const [showCountryModal, setShowCountryModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const handleRegister = () => {
     let isValid = true;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!email.trim()) {
       setEmailError('Iltimos, email manzilingizni kiriting!');
+      isValid = false;
+    } else if (!emailRegex.test(email.trim())) {
+      setEmailError('Iltimos, to\'g\'ri email manzili kiriting!');
       isValid = false;
     } else {
       setEmailError('');
@@ -41,6 +62,16 @@ export default function RegisterScreen() {
       isValid = false;
     } else {
       setPhoneError('');
+    }
+
+    if (!password.trim()) {
+      setPasswordError('Iltimos, parolingizni kiriting!');
+      isValid = false;
+    } else if (password.trim().length < 6) {
+      setPasswordError('Parol kamida 6 ta belgidan iborat bo\'lishi kerak!');
+      isValid = false;
+    } else {
+      setPasswordError('');
     }
 
     if (isValid) {
@@ -113,11 +144,14 @@ export default function RegisterScreen() {
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Phone</Text>
                 <View style={[styles.phoneWrapper, phoneError ? styles.phoneWrapperError : null]}>
-                  <View style={styles.countryCodeContainer}>
-                    <Text style={styles.flag}>🇺🇸</Text>
-                    <Text style={styles.countryCode}>{countryCode}</Text>
+                  <TouchableOpacity 
+                    style={styles.countryCodeContainer}
+                    onPress={() => setShowCountryModal(true)}
+                  >
+                    <Text style={styles.flag}>{selectedCountry.flag}</Text>
+                    <Text style={styles.countryCode}>{selectedCountry.code}</Text>
                     <Ionicons name="chevron-down-outline" size={14} color="#888888" style={styles.chevron} />
-                  </View>
+                  </TouchableOpacity>
                   <TextInput
                     style={[styles.input, styles.phoneInput]}
                     placeholder="Cell number"
@@ -131,6 +165,36 @@ export default function RegisterScreen() {
                   />
                 </View>
                 {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
+              </View>
+
+              {/* Password Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <View style={[styles.inputWrapper, passwordError ? styles.inputWrapperError : null]}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="•••••••••••••"
+                    placeholderTextColor="#A9A9A9"
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      if (passwordError) setPasswordError('');
+                    }}
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={styles.eyeIcon}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#A9A9A9"
+                    />
+                  </TouchableOpacity>
+                </View>
+                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
               </View>
 
               {/* Next Step Button (Styled with green border and green text as in screenshot) */}
@@ -153,6 +217,40 @@ export default function RegisterScreen() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Country Picker Modal */}
+      <Modal
+        visible={showCountryModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowCountryModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCountryModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Country / Davlatni tanlang</Text>
+            <ScrollView style={styles.countryList} showsVerticalScrollIndicator={false}>
+              {COUNTRIES.map((item) => (
+                <TouchableOpacity
+                  key={item.code + item.name}
+                  style={styles.countryItem}
+                  onPress={() => {
+                    setSelectedCountry(item);
+                    setShowCountryModal(false);
+                  }}
+                >
+                  <Text style={styles.countryFlagItem}>{item.flag}</Text>
+                  <Text style={styles.countryNameItem}>{item.name}</Text>
+                  <Text style={styles.countryCodeItem}>{item.code}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -336,5 +434,54 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 12,
     marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 40,
+    maxHeight: height * 0.55,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#3A5C18',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  countryList: {
+    width: '100%',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderColor: '#F0F9E8',
+  },
+  countryFlagItem: {
+    fontSize: 22,
+    marginRight: 14,
+  },
+  countryNameItem: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333333',
+    fontWeight: '500',
+  },
+  countryCodeItem: {
+    fontSize: 16,
+    color: '#8CC33F',
+    fontWeight: '700',
+  },
+  eyeIcon: {
+    padding: 4,
   },
 });
