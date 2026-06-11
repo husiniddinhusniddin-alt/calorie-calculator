@@ -24,18 +24,29 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [countryCode, setCountryCode] = useState('+1');
+  const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   const handleRegister = () => {
+    let isValid = true;
     if (!email.trim()) {
-      Alert.alert('Xatolik', 'Iltimos, email manzilingizni kiriting!');
-      return;
+      setEmailError('Iltimos, email manzilingizni kiriting!');
+      isValid = false;
+    } else {
+      setEmailError('');
     }
+
     if (!phone.trim()) {
-      Alert.alert('Xatolik', 'Iltimos, telefon raqamingizni kiriting!');
-      return;
+      setPhoneError('Iltimos, telefon raqamingizni kiriting!');
+      isValid = false;
+    } else {
+      setPhoneError('');
     }
-    // Navigate to the main tabs app
-    router.replace('/(tabs)');
+
+    if (isValid) {
+      // Navigate to the main tabs app
+      router.replace('/(tabs)');
+    }
   };
 
   return (
@@ -81,23 +92,27 @@ export default function RegisterScreen() {
               {/* Email Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Email</Text>
-                <View style={styles.inputWrapper}>
+                <View style={[styles.inputWrapper, emailError ? styles.inputWrapperError : null]}>
                   <TextInput
                     style={styles.input}
                     placeholder="Enter your email"
                     placeholderTextColor="#A9A9A9"
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      if (emailError) setEmailError('');
+                    }}
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
                 </View>
+                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
               </View>
 
               {/* Phone Input with Country Code Selector */}
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Phone</Text>
-                <View style={styles.phoneWrapper}>
+                <View style={[styles.phoneWrapper, phoneError ? styles.phoneWrapperError : null]}>
                   <View style={styles.countryCodeContainer}>
                     <Text style={styles.flag}>🇺🇸</Text>
                     <Text style={styles.countryCode}>{countryCode}</Text>
@@ -108,10 +123,14 @@ export default function RegisterScreen() {
                     placeholder="Cell number"
                     placeholderTextColor="#A9A9A9"
                     value={phone}
-                    onChangeText={setPhone}
+                    onChangeText={(text) => {
+                      setPhone(text);
+                      if (phoneError) setPhoneError('');
+                    }}
                     keyboardType="phone-pad"
                   />
                 </View>
+                {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
               </View>
 
               {/* Next Step Button (Styled with green border and green text as in screenshot) */}
@@ -306,5 +325,16 @@ const styles = StyleSheet.create({
     color: '#7EB93C',
     fontSize: 14,
     fontWeight: '700',
+  },
+  inputWrapperError: {
+    borderColor: '#FF3B30',
+  },
+  phoneWrapperError: {
+    borderColor: '#FF3B30',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: 4,
   },
 });

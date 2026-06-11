@@ -25,18 +25,29 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const handleLogin = () => {
+    let isValid = true;
     if (!email.trim()) {
-      Alert.alert('Xatolik', 'Iltimos, email manzilingizni kiriting!');
-      return;
+      setEmailError('Iltimos, email manzilingizni kiriting!');
+      isValid = false;
+    } else {
+      setEmailError('');
     }
+
     if (!password.trim()) {
-      Alert.alert('Xatolik', 'Iltimos, parolingizni kiriting!');
-      return;
+      setPasswordError('Iltimos, parolingizni kiriting!');
+      isValid = false;
+    } else {
+      setPasswordError('');
     }
-    // Navigate to the main tabs app
-    router.replace('/(tabs)');
+
+    if (isValid) {
+      // Navigate to the main tabs app
+      router.replace('/(tabs)');
+    }
   };
 
   return (
@@ -82,31 +93,38 @@ export default function LoginScreen() {
               {/* Email Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Email</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={20} color="#8CC33F" style={styles.inputIcon} />
+                <View style={[styles.inputWrapper, emailError ? styles.inputWrapperError : null]}>
+                  <Ionicons name="mail-outline" size={20} color={emailError ? '#FF3B30' : '#8CC33F'} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="example@gmail.com"
                     placeholderTextColor="#A9A9A9"
                     value={email}
-                    onChangeText={setEmail}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      if (emailError) setEmailError('');
+                    }}
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
                 </View>
+                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
               </View>
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Password</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="lock-closed-outline" size={20} color="#8CC33F" style={styles.inputIcon} />
+                <View style={[styles.inputWrapper, passwordError ? styles.inputWrapperError : null]}>
+                  <Ionicons name="lock-closed-outline" size={20} color={passwordError ? '#FF3B30' : '#8CC33F'} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="•••••••••••••"
                     placeholderTextColor="#A9A9A9"
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      if (passwordError) setPasswordError('');
+                    }}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                   />
@@ -121,6 +139,7 @@ export default function LoginScreen() {
                     />
                   </TouchableOpacity>
                 </View>
+                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
               </View>
 
               {/* Forgot Password */}
@@ -303,5 +322,13 @@ const styles = StyleSheet.create({
     color: '#7EB93C',
     fontSize: 14,
     fontWeight: '700',
+  },
+  inputWrapperError: {
+    borderColor: '#FF3B30',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: 4,
   },
 });
