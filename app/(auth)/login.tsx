@@ -30,8 +30,13 @@ export default function LoginScreen() {
 
   const handleLogin = () => {
     let isValid = true;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!email.trim()) {
       setEmailError('Iltimos, email manzilingizni kiriting!');
+      isValid = false;
+    } else if (!emailRegex.test(email.trim())) {
+      setEmailError('Iltimos, to\'g\'ri email manzili kiriting!');
       isValid = false;
     } else {
       setEmailError('');
