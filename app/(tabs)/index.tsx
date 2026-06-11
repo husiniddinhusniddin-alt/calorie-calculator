@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
@@ -50,6 +51,7 @@ const DAILY_CARBS = 66;
 const DAILY_PROTEINS = 32;
 
 export default function DiaryScreen() {
+  const router = useRouter();
   const [meals, setMeals] = useState(DIARY_MEALS);
 
   const totalCalories = meals.reduce((sum, m) => sum + m.calories, 0);
@@ -61,7 +63,17 @@ export default function DiaryScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-          <Text style={styles.headerTitle}>Daily calories</Text>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.headerTitle}>Daily calories</Text>
+            <TouchableOpacity 
+              activeOpacity={0.7}
+              style={styles.logoutButton} 
+              onPress={() => router.replace('/(auth)/login')}
+            >
+              <Ionicons name="log-out-outline" size={16} color="#FF3B30" />
+              <Text style={styles.logoutText}>Log out</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.headerMacros}>
             <View style={styles.macroChip}>
               <Text style={styles.macroChipValue}>{DAILY_FATS}g</Text>
@@ -334,5 +346,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#7EB93C',
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF2F2',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 4,
+  },
+  logoutText: {
+    color: '#FF3B30',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
