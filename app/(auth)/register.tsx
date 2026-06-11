@@ -46,6 +46,7 @@ export default function RegisterScreen() {
   const handleRegister = () => {
     let isValid = true;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
 
     if (!email.trim()) {
       setEmailError('Iltimos, email manzilingizni kiriting!');
@@ -59,6 +60,12 @@ export default function RegisterScreen() {
 
     if (!phone.trim()) {
       setPhoneError('Iltimos, telefon raqamingizni kiriting!');
+      isValid = false;
+    } else if (selectedCountry.code === '+998' && cleanPhone.length !== 9) {
+      setPhoneError('Telefon raqami 9 ta raqamdan iborat bo\'lishi kerak (masalan: 901234567)!');
+      isValid = false;
+    } else if (cleanPhone.length < 7 || cleanPhone.length > 15) {
+      setPhoneError('Iltimos, to\'g\'ri telefon raqami kiriting!');
       isValid = false;
     } else {
       setPhoneError('');
