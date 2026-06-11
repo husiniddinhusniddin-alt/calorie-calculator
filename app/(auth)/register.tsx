@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,14 @@ export default function RegisterScreen() {
   const [countryCode, setCountryCode] = useState('+1');
 
   const handleRegister = () => {
+    if (!email.trim()) {
+      Alert.alert('Xatolik', 'Iltimos, email manzilingizni kiriting!');
+      return;
+    }
+    if (!phone.trim()) {
+      Alert.alert('Xatolik', 'Iltimos, telefon raqamingizni kiriting!');
+      return;
+    }
     // Navigate to the main tabs app
     router.replace('/(tabs)');
   };

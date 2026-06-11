@@ -11,6 +11,7 @@ import {
   ScrollView,
   Dimensions,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,14 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = () => {
+    if (!email.trim()) {
+      Alert.alert('Xatolik', 'Iltimos, email manzilingizni kiriting!');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Xatolik', 'Iltimos, parolingizni kiriting!');
+      return;
+    }
     // Navigate to the main tabs app
     router.replace('/(tabs)');
   };
