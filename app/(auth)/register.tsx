@@ -140,33 +140,6 @@ export default function RegisterScreen() {
                 {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
               </View>
 
-              {/* Phone Input with Country Code Selector */}
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Phone</Text>
-                <View style={[styles.phoneWrapper, phoneError ? styles.phoneWrapperError : null]}>
-                  <TouchableOpacity 
-                    style={styles.countryCodeContainer}
-                    onPress={() => setShowCountryModal(true)}
-                  >
-                    <Text style={styles.flag}>{selectedCountry.flag}</Text>
-                    <Text style={styles.countryCode}>{selectedCountry.code}</Text>
-                    <Ionicons name="chevron-down-outline" size={14} color="#888888" style={styles.chevron} />
-                  </TouchableOpacity>
-                  <TextInput
-                    style={[styles.input, styles.phoneInput]}
-                    placeholder="Cell number"
-                    placeholderTextColor="#A9A9A9"
-                    value={phone}
-                    onChangeText={(text) => {
-                      setPhone(text);
-                      if (phoneError) setPhoneError('');
-                    }}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-                {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
-              </View>
-
               {/* Password Input */}
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Password</Text>
@@ -195,6 +168,33 @@ export default function RegisterScreen() {
                   </TouchableOpacity>
                 </View>
                 {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+              </View>
+
+              {/* Phone Input with Country Code Selector */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Phone</Text>
+                <View style={[styles.phoneWrapper, phoneError ? styles.phoneWrapperError : null]}>
+                  <TouchableOpacity 
+                    style={styles.countryCodeContainer}
+                    onPress={() => setShowCountryModal(true)}
+                  >
+                    <Text style={styles.flag}>{selectedCountry.flag}</Text>
+                    <Text style={styles.countryCode}>{selectedCountry.code}</Text>
+                    <Ionicons name="chevron-down-outline" size={14} color="#888888" style={styles.chevron} />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[styles.input, styles.phoneInput]}
+                    placeholder="Cell number"
+                    placeholderTextColor="#A9A9A9"
+                    value={phone}
+                    onChangeText={(text) => {
+                      setPhone(text);
+                      if (phoneError) setPhoneError('');
+                    }}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+                {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
               </View>
 
               {/* Next Step Button (Styled with green border and green text as in screenshot) */}
