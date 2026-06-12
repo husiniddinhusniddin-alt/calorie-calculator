@@ -97,7 +97,7 @@ export default function DiaryScreen() {
         {/* Progress Bar */}
         <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.progressCard}>
           <View style={styles.progressRow}>
-            <Text style={styles.progressLabel}>Today's intake</Text>
+            <Text style={styles.progressLabel}>{"Today's intake"}</Text>
             <Text style={styles.progressValue}>
               <Text style={styles.progressCurrent}>{totalCalories}</Text>
               <Text style={styles.progressTotal}> / {DAILY_GOAL} kcal</Text>
