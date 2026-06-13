@@ -2,8 +2,14 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/haptic-tab';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const colorScheme = useColorScheme();
+  const themeColors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -16,17 +22,17 @@ export default function TabLayout() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1.5,
           borderTopColor: '#EBF2E5',
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons size={24} name={focused ? 'grid' : 'grid-outline'} color={color} />
+            <Ionicons size={24} name={focused ? 'home' : 'home-outline'} color={color} />
           ),
         }}
       />

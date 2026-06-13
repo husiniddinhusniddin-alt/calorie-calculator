@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 16,
     paddingTop: 15,
-    paddingBottom: 40,
+    paddingBottom: 80,
   },
   pageTitle: {
     fontSize: 24,
