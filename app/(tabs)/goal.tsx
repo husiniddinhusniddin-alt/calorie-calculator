@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  useColorScheme,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
@@ -20,22 +21,36 @@ import {
   Portal 
 } from 'react-native-paper';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { MockStore } from '@/constants/store';
 
-
-
-const CURRENT_WEIGHT = 85; // Fixed current weight as per requirements
-const STARTING_WEIGHT = 88; // Fixed starting weight for calculation of progress
+const CURRENT_WEIGHT = 85; 
+const STARTING_WEIGHT = 88; 
 
 export default function GoalSettingScreen() {
-  // Goal Settings State
-  const [targetWeight, setTargetWeight] = useState<string>('82');
-  const [dailyCalorieGoal, setDailyCalorieGoal] = useState<string>('1900');
-  const [weeklyWeightGoal, setWeeklyWeightGoal] = useState<number>(0.5); // kg per week
-  const [targetDate, setTargetDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 90); // Default target 90 days from now
-    return d;
-  });
+  const colorScheme = useColorScheme();
+  const isDark = false; // Force light mode to match the rest of the app
+
+  // Theme Colors
+  const theme = {
+    background: '#F7FAF3', // Matches home page background color
+    cardBackground: '#FFFFFF',
+    cardBorder: '#EBF2E5',
+    textPrimary: '#1A2310',
+    textBrand: '#3A5C18',
+    textMuted: '#6B785E',
+    badgeBackground: '#F0FAE4',
+    badgeBorder: '#C8E8A0',
+    inputText: '#1A2310',
+    inputBackground: '#FFFFFF',
+    inputOutline: '#EBF2E5',
+    suggestedBoxBg: '#F5F5F5',
+  };
+
+  // Goal Settings State (Synced with MockStore)
+  const [targetWeight, setTargetWeight] = useState<string>(MockStore.targetWeight.toString());
+  const [dailyCalorieGoal, setDailyCalorieGoal] = useState<string>(MockStore.dailyCalorieGoal.toString());
+  const [weeklyWeightGoal, setWeeklyWeightGoal] = useState<number>(MockStore.weeklyWeightGoal);
+  const [targetDate, setTargetDate] = useState<Date>(MockStore.targetDate);
 
   // UI States
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
@@ -43,25 +58,26 @@ export default function GoalSettingScreen() {
   const [snackbarMessage, setSnackbarMessage] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  // Parse numeric target weight
+  // Subscribe to MockStore updates
+  useEffect(() => {
+    return MockStore.subscribe(() => {
+      setTargetWeight(MockStore.targetWeight.toString());
+      setDailyCalorieGoal(MockStore.dailyCalorieGoal.toString());
+      setWeeklyWeightGoal(MockStore.weeklyWeightGoal);
+      setTargetDate(MockStore.targetDate);
+    });
+  }, []);
+
   const parsedTargetWeight = parseFloat(targetWeight) || 0;
-  
-  // Calculate difference
   const weightDiff = CURRENT_WEIGHT - parsedTargetWeight;
   const isLoss = weightDiff >= 0;
   const absWeightDiff = Math.abs(weightDiff);
 
-  // Dynamic Progress Calculation
-  // Starting Weight: 88, Current Weight: 85.
-  // Weight lost so far: 88 - 85 = 3 kg.
-  // Total weight to lose: 88 - Target Weight.
-  // Progress % = (Weight Lost So Far / Total Weight To Lose) * 100
   const totalGoalWeightChange = STARTING_WEIGHT - parsedTargetWeight;
   const progressPercent = totalGoalWeightChange > 0 
     ? Math.min(Math.max(((STARTING_WEIGHT - CURRENT_WEIGHT) / totalGoalWeightChange) * 100, 0), 100)
     : 0;
 
-  // Estimated Days Remaining
   const getDaysRemaining = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -72,23 +88,18 @@ export default function GoalSettingScreen() {
   };
   const daysRemaining = getDaysRemaining();
 
-  // Dynamic Calorie Suggestion Algorithm
-  // TDEE estimated around 2400 kcal for 85kg active-moderate male
-  // 0.5 kg loss per week requires ~500 kcal deficit per day.
-  // Suggested Calories = TDEE - (deficit/surplus based on target)
   const calculateSuggestedCalories = () => {
-    const baseTdee = 2400; // Average base maintenance
+    const baseTdee = 2400; 
     if (parsedTargetWeight === CURRENT_WEIGHT) {
       return baseTdee;
     }
     const weightChangeFactor = isLoss ? -1 : 1;
-    const dailyDeficit = (weeklyWeightGoal * 7700) / 7; // 7700 kcal per kg of body fat
+    const dailyDeficit = (weeklyWeightGoal * 7700) / 7; 
     const suggestion = baseTdee + (weightChangeFactor * dailyDeficit);
     return Math.round(suggestion);
   };
   const suggestedCalories = calculateSuggestedCalories();
 
-  // Handle Target Date selection from native picker
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
@@ -98,15 +109,12 @@ export default function GoalSettingScreen() {
     }
   };
 
-  // Adjust target weight with stepper buttons
   const adjustTargetWeight = (amount: number) => {
     const current = parseFloat(targetWeight) || 0;
     const newVal = Math.max(30, Math.min(250, current + amount));
-    // Round to 1 decimal place
     setTargetWeight((Math.round(newVal * 10) / 10).toString());
   };
 
-  // Save Goal Handler
   const handleSaveGoal = () => {
     if (parsedTargetWeight <= 0) {
       setSnackbarMessage('Please enter a valid target weight.');
@@ -120,28 +128,39 @@ export default function GoalSettingScreen() {
     }
 
     setIsSaving(true);
-    // Simulate API/Async storage saving
     setTimeout(() => {
+      MockStore.update({
+        targetWeight: parsedTargetWeight,
+        dailyCalorieGoal: parseFloat(dailyCalorieGoal) || 1900,
+        weeklyWeightGoal: weeklyWeightGoal,
+        targetDate: targetDate,
+      });
       setIsSaving(false);
       setSnackbarMessage('Goals saved successfully! 🎉');
       setSnackbarVisible(true);
     }, 1200);
   };
 
-  // Reset Goal Handler
   const handleResetGoal = () => {
+    const defaultDate = new Date();
+    defaultDate.setDate(defaultDate.getDate() + 90);
+    
     setTargetWeight('82');
     setDailyCalorieGoal('1900');
     setWeeklyWeightGoal(0.5);
-    const d = new Date();
-    d.setDate(d.getDate() + 90);
-    setTargetDate(d);
+    setTargetDate(defaultDate);
+
+    MockStore.update({
+      targetWeight: 82,
+      dailyCalorieGoal: 1900,
+      weeklyWeightGoal: 0.5,
+      targetDate: defaultDate,
+    });
     
     setSnackbarMessage('Goal settings reset to defaults.');
     setSnackbarVisible(true);
   };
 
-  // Format Date for display
   const formatDateString = (date: Date) => {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -152,8 +171,8 @@ export default function GoalSettingScreen() {
 
   return (
     <PaperProvider>
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
@@ -166,37 +185,36 @@ export default function GoalSettingScreen() {
             {/* Top Header Section */}
             <Animated.View entering={FadeInDown.duration(500)} style={styles.headerSection}>
               <View style={styles.flagIconContainer}>
-                <View style={styles.flagIconInner}>
+                <View style={[styles.flagIconInner, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}>
                   <Ionicons name="flag" size={32} color="#7EB93C" />
                 </View>
-                {/* Decorative pulse ring */}
                 <View style={styles.pulseRing} />
               </View>
-              <Text style={styles.title}>Set Your Goal</Text>
-              <Text style={styles.subtitle}>Track your progress and stay motivated.</Text>
+              <Text style={[styles.title, { color: theme.textBrand }]}>Set Your Goal</Text>
+              <Text style={[styles.subtitle, { color: theme.textMuted }]}>Track your progress and stay motivated.</Text>
             </Animated.View>
 
             {/* Goal Card */}
             <Animated.View 
               entering={FadeInDown.duration(500).delay(100)} 
-              style={styles.card}
+              style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
             >
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Weight Goal</Text>
-                <View style={styles.currentWeightBadge}>
-                  <Text style={styles.currentWeightLabel}>Current: </Text>
-                  <Text style={styles.currentWeightValue}>{CURRENT_WEIGHT} kg</Text>
+                <Text style={[styles.cardTitle, { color: theme.textBrand }]}>Weight Goal</Text>
+                <View style={[styles.currentWeightBadge, { backgroundColor: theme.background, borderColor: theme.cardBorder }]}>
+                  <Text style={[styles.currentWeightLabel, { color: theme.textMuted }]}>Current: </Text>
+                  <Text style={[styles.currentWeightValue, { color: theme.textBrand }]}>{CURRENT_WEIGHT} kg</Text>
                 </View>
               </View>
 
               {/* Target Weight Inputs with Stepper */}
               <View style={styles.weightInputRow}>
                 <TouchableOpacity 
-                  style={styles.stepperButton}
+                  style={[styles.stepperButton, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
                   onPress={() => adjustTargetWeight(-0.5)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="remove" size={24} color="#3A5C18" />
+                  <Ionicons name="remove" size={24} color="#7EB93C" />
                 </TouchableOpacity>
 
                 <View style={styles.inputContainer}>
@@ -207,30 +225,31 @@ export default function GoalSettingScreen() {
                     onChangeText={setTargetWeight}
                     keyboardType="decimal-pad"
                     activeOutlineColor="#7EB93C"
-                    outlineColor="#EBF2E5"
+                    outlineColor={theme.inputOutline}
+                    textColor={theme.inputText}
+                    theme={{ colors: { background: theme.inputBackground } }}
                     style={styles.textInput}
-                    textColor="#1A2310"
                     dense
                   />
                 </View>
 
                 <TouchableOpacity 
-                  style={styles.stepperButton}
+                  style={[styles.stepperButton, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
                   onPress={() => adjustTargetWeight(0.5)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="add" size={24} color="#3A5C18" />
+                  <Ionicons name="add" size={24} color="#7EB93C" />
                 </TouchableOpacity>
               </View>
 
               {/* Automatic Difference Callout */}
-              <Animated.View layout={Layout.springify()} style={styles.diffContainer}>
+              <Animated.View layout={Layout.springify()} style={[styles.diffContainer, { backgroundColor: theme.badgeBackground }]}>
                 <Ionicons 
                   name={isLoss ? "arrow-down-circle" : "arrow-up-circle"} 
                   size={20} 
                   color="#7EB93C" 
                 />
-                <Text style={styles.diffText}>
+                <Text style={[styles.diffText, { color: theme.textBrand }]}>
                   {absWeightDiff === 0 
                     ? "Weight maintenance target" 
                     : `${absWeightDiff.toFixed(1)} kg ${isLoss ? 'remaining' : 'to gain'} to reach goal`
@@ -242,23 +261,22 @@ export default function GoalSettingScreen() {
             {/* Progress Section */}
             <Animated.View 
               entering={FadeInDown.duration(500).delay(200)} 
-              style={styles.card}
+              style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
             >
               <View style={styles.progressHeader}>
-                <Text style={styles.progressTitle}>Goal Progress</Text>
+                <Text style={[styles.progressTitle, { color: theme.textBrand }]}>Goal Progress</Text>
                 <Text style={styles.progressPctText}>{Math.round(progressPercent)}% Completed</Text>
               </View>
 
-              {/* Custom High-Fidelity Progress Bar */}
-              <View style={styles.progressBarBackground}>
+              <View style={[styles.progressBarBackground, { backgroundColor: theme.badgeBackground }]}>
                 <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]}>
                   {progressPercent > 0 && <View style={styles.progressBarThumb} />}
                 </View>
               </View>
 
               <View style={styles.progressFooter}>
-                <Ionicons name="information-circle-outline" size={16} color="#6B785E" />
-                <Text style={styles.progressFooterText}>
+                <Ionicons name="information-circle-outline" size={16} color={theme.textMuted} />
+                <Text style={[styles.progressFooterText, { color: theme.textMuted }]}>
                   {absWeightDiff === 0 
                     ? "You are exactly at your target weight!"
                     : `${absWeightDiff.toFixed(1)} kg remaining to reach your goal.`
@@ -270,26 +288,25 @@ export default function GoalSettingScreen() {
             {/* Calorie Goal Section */}
             <Animated.View 
               entering={FadeInDown.duration(500).delay(300)} 
-              style={styles.card}
+              style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
             >
-              <Text style={styles.cardTitle}>Daily Calorie Target</Text>
-              <Text style={styles.sectionDesc}>
+              <Text style={[styles.cardTitle, { color: theme.textBrand }]}>Daily Calorie Target</Text>
+              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>
                 Customize your daily target or use our suggestion based on your target weight.
               </Text>
 
-              {/* Weekly Weight Change Selection Chips */}
-              <Text style={styles.subLabel}>Weekly Change Rate</Text>
+              <Text style={[styles.subLabel, { color: theme.textBrand }]}>Weekly Change Rate</Text>
               <View style={styles.chipContainer}>
                 {[0.25, 0.5, 0.75, 1.0].map((rate) => {
                   const isSelected = weeklyWeightGoal === rate;
                   return (
                     <TouchableOpacity
                       key={rate}
-                      style={[styles.chip, isSelected && styles.chipActive]}
+                      style={[styles.chip, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }, isSelected && styles.chipActive]}
                       onPress={() => setWeeklyWeightGoal(rate)}
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
+                      <Text style={[styles.chipText, { color: theme.textMuted }, isSelected && styles.chipTextActive]}>
                         {rate} kg/wk
                       </Text>
                     </TouchableOpacity>
@@ -307,13 +324,14 @@ export default function GoalSettingScreen() {
                     onChangeText={setDailyCalorieGoal}
                     keyboardType="number-pad"
                     activeOutlineColor="#7EB93C"
-                    outlineColor="#EBF2E5"
+                    outlineColor={theme.inputOutline}
+                    textColor={theme.inputText}
+                    theme={{ colors: { background: theme.inputBackground } }}
                     style={styles.textInput}
-                    textColor="#1A2310"
                   />
                 </View>
-                <View style={styles.suggestedBox}>
-                  <Text style={styles.suggestedLabel}>Suggested</Text>
+                <View style={[styles.suggestedBox, { backgroundColor: theme.suggestedBoxBg, borderColor: theme.cardBorder }]}>
+                  <Text style={[styles.suggestedLabel, { color: theme.textMuted }]}>Suggested</Text>
                   <Text style={styles.suggestedValue}>{suggestedCalories} kcal</Text>
                 </View>
               </View>
@@ -322,22 +340,22 @@ export default function GoalSettingScreen() {
             {/* Timeline Section */}
             <Animated.View 
               entering={FadeInDown.duration(500).delay(400)} 
-              style={styles.card}
+              style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
             >
-              <Text style={styles.cardTitle}>Timeline</Text>
-              <Text style={styles.sectionDesc}>
+              <Text style={[styles.cardTitle, { color: theme.textBrand }]}>Timeline</Text>
+              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>
                 Pick your target completion date to calculate your required daily commitment.
               </Text>
 
               <TouchableOpacity 
-                style={styles.datePickerTrigger}
+                style={[styles.datePickerTrigger, { backgroundColor: theme.badgeBackground, borderColor: theme.badgeBorder }]}
                 onPress={() => setShowDatePicker(prev => !prev)}
                 activeOpacity={0.7}
               >
                 <View style={styles.dateInfo}>
                   <Ionicons name="calendar" size={22} color="#7EB93C" />
                   <View style={{ marginLeft: 12 }}>
-                    <Text style={styles.datePickerLabel}>Target Date</Text>
+                    <Text style={[styles.datePickerLabel, { color: theme.textMuted }]}>Target Date</Text>
                     <Text style={styles.datePickerValue}>{formatDateString(targetDate)}</Text>
                   </View>
                 </View>
@@ -346,7 +364,7 @@ export default function GoalSettingScreen() {
 
               {/* Web Native Date input backup */}
               {Platform.OS === 'web' && showDatePicker && (
-                <View style={styles.webDateContainer}>
+                <View style={[styles.webDateContainer, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
                   <input
                     type="date"
                     value={targetDate.toISOString().split('T')[0]}
@@ -355,7 +373,7 @@ export default function GoalSettingScreen() {
                       if (e.target.value) setTargetDate(new Date(e.target.value));
                       setShowDatePicker(false);
                     }}
-                    style={styles.webDatePicker}
+                    style={StyleSheet.flatten([styles.webDatePicker, { borderColor: theme.badgeBorder, color: '#7EB93C', backgroundColor: theme.suggestedBoxBg }]) as any}
                   />
                   <TouchableOpacity 
                     style={styles.webDateCloseBtn}
@@ -368,7 +386,7 @@ export default function GoalSettingScreen() {
 
               {/* Native Mobile Date Picker */}
               {Platform.OS !== 'web' && showDatePicker && (
-                <View style={styles.iosDatePickerContainer}>
+                <View style={[styles.iosDatePickerContainer, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
                   <DateTimePicker
                     value={targetDate}
                     mode="date"
@@ -376,7 +394,7 @@ export default function GoalSettingScreen() {
                     minimumDate={new Date()}
                     onChange={handleDateChange}
                     accentColor="#7EB93C"
-                    themeVariant="light"
+                    themeVariant={isDark ? 'dark' : 'light'}
                   />
                   {Platform.OS === 'ios' && (
                     <TouchableOpacity 
@@ -391,9 +409,9 @@ export default function GoalSettingScreen() {
               )}
 
               {/* Days remaining badge */}
-              <View style={styles.daysRemainingContainer}>
-                <Ionicons name="time-outline" size={20} color="#3A5C18" />
-                <Text style={styles.daysRemainingText}>
+              <View style={[styles.daysRemainingContainer, { backgroundColor: theme.badgeBackground }]}>
+                <Ionicons name="time-outline" size={20} color="#7EB93C" />
+                <Text style={[styles.daysRemainingText, { color: theme.textBrand }]}>
                   Estimated <Text style={styles.daysRemainingBold}>{daysRemaining} days</Text> remaining to your target.
                 </Text>
               </View>
@@ -422,7 +440,7 @@ export default function GoalSettingScreen() {
               style={styles.buttonRow}
             >
               <TouchableOpacity 
-                style={styles.resetButton} 
+                style={[styles.resetButton, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]} 
                 onPress={handleResetGoal}
                 activeOpacity={0.7}
               >
@@ -448,7 +466,6 @@ export default function GoalSettingScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Success / Warning Toasts */}
         <Portal>
           <Snackbar
             visible={snackbarVisible}
@@ -472,33 +489,58 @@ export default function GoalSettingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAF3',
   },
   scroll: {
     paddingHorizontal: 16,
-    paddingTop: 15,
-    paddingBottom: 80,
+    paddingTop: 10,
+    paddingBottom: 40,
+  },
+  headerSection: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  flagIconContainer: {
+    width: 68,
+    height: 68,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  flagIconInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+    borderWidth: 1.5,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#7EB93C',
+    opacity: 0.12,
+    zIndex: 1,
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#3A5C18',
     marginBottom: 6,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B785E',
     textAlign: 'center',
     fontWeight: '500',
   },
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
     shadowColor: '#3A5C18',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
@@ -514,11 +556,9 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#3A5C18',
   },
   sectionDesc: {
     fontSize: 13,
-    color: '#6B785E',
     lineHeight: 18,
     marginBottom: 16,
     marginTop: 2,
@@ -526,22 +566,18 @@ const styles = StyleSheet.create({
   currentWeightBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F7FAF3',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#EBF2E5',
   },
   currentWeightLabel: {
     fontSize: 12,
-    color: '#6B785E',
     fontWeight: '600',
   },
   currentWeightValue: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#3A5C18',
   },
   weightInputRow: {
     flexDirection: 'row',
@@ -553,9 +589,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: '#F0FAE4',
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -564,12 +598,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   textInput: {
-    backgroundColor: '#FFFFFF',
+    height: 48,
   },
   diffContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FAE4',
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 14,
@@ -578,7 +611,6 @@ const styles = StyleSheet.create({
   diffText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#3A5C18',
   },
   progressHeader: {
     flexDirection: 'row',
@@ -589,7 +621,6 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#3A5C18',
   },
   progressPctText: {
     fontSize: 14,
@@ -598,7 +629,6 @@ const styles = StyleSheet.create({
   },
   progressBarBackground: {
     height: 12,
-    backgroundColor: '#F0FAE4',
     borderRadius: 6,
     overflow: 'hidden',
     marginBottom: 14,
@@ -625,13 +655,11 @@ const styles = StyleSheet.create({
   },
   progressFooterText: {
     fontSize: 12,
-    color: '#6B785E',
     fontWeight: '600',
   },
   subLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#3A5C18',
     marginBottom: 8,
   },
   chipContainer: {
@@ -644,9 +672,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
   },
   chipActive: {
     backgroundColor: '#7EB93C',
@@ -655,7 +681,6 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#6B785E',
   },
   chipTextActive: {
     color: '#FFFFFF',
@@ -670,9 +695,7 @@ const styles = StyleSheet.create({
   },
   suggestedBox: {
     flex: 1,
-    backgroundColor: '#F7FAF3',
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -682,7 +705,6 @@ const styles = StyleSheet.create({
   suggestedLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#6B785E',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 2,
@@ -696,9 +718,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F0FAE4',
     borderWidth: 1.5,
-    borderColor: '#C8E8A0',
     borderRadius: 16,
     padding: 14,
     marginBottom: 16,
@@ -710,7 +730,6 @@ const styles = StyleSheet.create({
   datePickerLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#9AA88E',
   },
   datePickerValue: {
     fontSize: 14,
@@ -721,7 +740,6 @@ const styles = StyleSheet.create({
   daysRemainingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FAE4',
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -729,7 +747,6 @@ const styles = StyleSheet.create({
   },
   daysRemainingText: {
     fontSize: 13,
-    color: '#3A5C18',
     fontWeight: '600',
   },
   daysRemainingBold: {
@@ -780,16 +797,13 @@ const styles = StyleSheet.create({
   },
   resetButton: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
     borderRadius: 28,
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
   },
   resetButtonText: {
-    color: '#6B785E',
     fontSize: 15,
     fontWeight: '700',
   },
@@ -820,9 +834,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   webDateContainer: {
-    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
     borderRadius: 16,
     padding: 12,
     marginBottom: 16,
@@ -835,9 +847,6 @@ const styles = StyleSheet.create({
     padding: 8,
     fontSize: 14,
     borderWidth: 1,
-    borderColor: '#C8E8A0',
-    backgroundColor: '#FAFCF8',
-    color: '#7EB93C',
     borderRadius: 8,
     marginRight: 8,
   },
@@ -853,11 +862,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   iosDatePickerContainer: {
-    backgroundColor: '#FAFCF8',
     borderRadius: 16,
     padding: 8,
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
     marginBottom: 16,
     overflow: 'hidden',
   },
