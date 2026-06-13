@@ -3,19 +3,23 @@ import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/haptic-tab';
 
+import { useColorScheme } from 'react-native';
+
 export default function TabLayout() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
 
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#7EB93C',
-        tabBarInactiveTintColor: '#9BA1A6',
+        tabBarInactiveTintColor: isDark ? '#9AA88E' : '#9BA1A6',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDark ? '#171E10' : '#FFFFFF',
           borderTopWidth: 1.5,
-          borderTopColor: '#EBF2E5',
+          borderTopColor: isDark ? '#2A3A1E' : '#EBF2E5',
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
