@@ -14,7 +14,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: themeColors.tint,
+        tabBarActiveTintColor: '#7EB93C',
         tabBarInactiveTintColor: '#9BA1A6',
         headerShown: false,
         tabBarButton: HapticTab,
@@ -39,9 +39,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Search',
+          title: 'Calories',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons size={24} name={focused ? 'search' : 'search-outline'} color={color} />
+            <Ionicons size={24} name={focused ? 'flame' : 'flame-outline'} color={color} />
           ),
         }}
       />
@@ -60,6 +60,15 @@ export default function TabLayout() {
           title: 'History',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'time' : 'time-outline'} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons size={24} name={focused ? 'person' : 'person-outline'} color={color} />
           ),
         }}
       />
