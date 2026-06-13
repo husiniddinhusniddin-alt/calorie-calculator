@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 80,
   },
   dishCard: {
     flexDirection: 'row',
