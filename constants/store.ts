@@ -6,6 +6,10 @@ interface StoreState {
   dailyCalorieGoal: number;
   weeklyWeightGoal: number;
   targetDate: Date;
+  appTheme: 'light' | 'dark' | 'system';
+  language: 'en' | 'ru' | 'uz';
+  name: string;
+  email: string;
 }
 
 export const MockStore = {
@@ -16,6 +20,10 @@ export const MockStore = {
   dailyCalorieGoal: 1900,
   weeklyWeightGoal: 0.5,
   targetDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+  appTheme: 'system' as 'light' | 'dark' | 'system',
+  language: 'en' as 'en' | 'ru' | 'uz',
+  name: 'Alex Green',
+  email: 'alex.green@health.com',
   listeners: [] as Array<() => void>,
   subscribe(listener: () => void) {
     this.listeners.push(listener);

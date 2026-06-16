@@ -1,14 +1,32 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useColorScheme } from 'react-native';
+import { MockStore } from '@/constants/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const tabTranslations = {
+  en: { home: 'Home', calories: 'Calories', goal: 'Goal', history: 'History', profile: 'Profile' },
+  ru: { home: 'Главная', calories: 'Калории', goal: 'Цель', history: 'История', profile: 'Профиль' },
+  uz: { home: 'Bosh sahifa', calories: 'Kaloriyalar', goal: 'Maqsad', history: 'Tarix', profile: 'Profil' }
+};
+
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const [appTheme, setAppTheme] = useState(MockStore.appTheme);
+  const [language, setLanguage] = useState(MockStore.language);
+  
+  useEffect(() => {
+    return MockStore.subscribe(() => {
+      setAppTheme(MockStore.appTheme);
+      setLanguage(MockStore.language);
+    });
+  }, []);
+
+  const systemColorScheme = useColorScheme();
+  const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
+  const t = tabTranslations[language] || tabTranslations.en;
 
   return (
     <Tabs
@@ -29,7 +47,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t.home,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'home' : 'home-outline'} color={color} />
           ),
@@ -38,7 +56,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Calories',
+          title: t.calories,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'flame' : 'flame-outline'} color={color} />
           ),
@@ -47,7 +65,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="goal"
         options={{
-          title: 'Goal',
+          title: t.goal,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'flag' : 'flag-outline'} color={color} />
           ),
@@ -56,7 +74,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
+          title: t.history,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'time' : 'time-outline'} color={color} />
           ),
@@ -65,7 +83,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t.profile,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'person' : 'person-outline'} color={color} />
           ),

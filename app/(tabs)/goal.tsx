@@ -22,28 +22,157 @@ import {
 } from 'react-native-paper';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
 
 const CURRENT_WEIGHT = 85; 
 const STARTING_WEIGHT = 88; 
 
+const translations = {
+  en: {
+    setGoal: 'Set Your Goal',
+    trackProgress: 'Track your progress and stay motivated.',
+    weightGoal: 'Weight Goal',
+    current: 'Current: ',
+    targetWeightLabel: 'Target Weight (kg)',
+    maintenance: 'Weight maintenance target',
+    remainingToLoss: '{diff} kg remaining to reach goal',
+    remainingToGain: '{diff} kg to gain to reach goal',
+    goalProgress: 'Goal Progress',
+    completed: 'Completed',
+    remainingDescLoss: '{diff} kg remaining to reach your goal.',
+    remainingDescGain: '{diff} kg to gain to reach your goal.',
+    atTargetWeight: 'You are exactly at your target weight!',
+    dailyCalorieTarget: 'Daily Calorie Target',
+    calorieTargetDesc: 'Customize your daily target or use our suggestion based on your target weight.',
+    weeklyChangeRate: 'Weekly Change Rate',
+    kgWk: '{rate} kg/wk',
+    dailyCaloriesLabel: 'Daily Calories (kcal)',
+    suggested: 'Suggested',
+    timeline: 'Timeline',
+    timelineDesc: 'Pick your target completion date to calculate your required daily commitment.',
+    targetDateLabel: 'Target Date',
+    daysRemainingDesc: 'Estimated {days} days remaining to your target.',
+    motivationQuote: '"Every small step brings you closer to your goal."',
+    motivationAuthor: 'Fitness Journey',
+    resetGoal: 'Reset Goal',
+    saveGoal: 'Save Goal',
+    
+    // Alerts/Snackbars
+    resetMsg: 'Goal settings reset to defaults.',
+    saveSuccess: 'Goals saved successfully! 🎉',
+    validWeightErr: 'Please enter a valid target weight.',
+    calorieErr: 'Daily calorie goal must be at least 800 kcal.',
+    confirmTargetDate: 'Confirm Target Date',
+    done: 'Done',
+  },
+  ru: {
+    setGoal: 'Установите цель',
+    trackProgress: 'Отслеживайте прогресс и оставайтесь мотивированными.',
+    weightGoal: 'Целевой вес',
+    current: 'Текущий: ',
+    targetWeightLabel: 'Целевой вес (кг)',
+    maintenance: 'Поддержание веса',
+    remainingToLoss: 'Осталось {diff} кг до цели',
+    remainingToGain: 'Нужно набрать {diff} кг до цели',
+    goalProgress: 'Прогресс цели',
+    completed: 'завершено',
+    remainingDescLoss: 'Осталось {diff} кг до вашей цели.',
+    remainingDescGain: 'Нужно набрать {diff} кг до вашей цели.',
+    atTargetWeight: 'Вы находитесь точно в целевом весе!',
+    dailyCalorieTarget: 'Дневная цель калорий',
+    calorieTargetDesc: 'Настройте дневную цель или используйте наши рекомендации на основе целевого веса.',
+    weeklyChangeRate: 'Скорость изменения веса',
+    kgWk: '{rate} кг/нед',
+    dailyCaloriesLabel: 'Дневные калории (ккал)',
+    suggested: 'Рекомендуется',
+    timeline: 'Сроки',
+    timelineDesc: 'Выберите целевую дату для расчета ваших ежедневных задач.',
+    targetDateLabel: 'Целевая дата',
+    daysRemainingDesc: 'До вашей цели осталось примерно {days} дней.',
+    motivationQuote: '"Каждый маленький шаг приближает вас к цели."',
+    motivationAuthor: 'Фитнес-путешествие',
+    resetGoal: 'Сбросить цель',
+    saveGoal: 'Сохранить цель',
+    
+    resetMsg: 'Настройки целей сброшены по умолчанию.',
+    saveSuccess: 'Цели успешно сохранены! 🎉',
+    validWeightErr: 'Пожалуйста, введите корректный целевой вес.',
+    calorieErr: 'Дневная цель калорий должна быть не менее 800 ккал.',
+    confirmTargetDate: 'Подтвердить дату',
+    done: 'Готово',
+  },
+  uz: {
+    setGoal: 'Maqsadingizni belgilang',
+    trackProgress: 'Rivojlanishingizni kuzatib boring va motivatsiyada bo\'ling.',
+    weightGoal: 'Vazn maqsadi',
+    current: 'Hozirgi: ',
+    targetWeightLabel: 'Maqsadli vazn (kg)',
+    maintenance: 'Vaznni saqlash maqsadi',
+    remainingToLoss: 'Maqsadgacha {diff} kg qoldi',
+    remainingToGain: 'Maqsadgacha {diff} kg semirish kerak',
+    goalProgress: 'Maqsad progressi',
+    completed: 'bajarildi',
+    remainingDescLoss: 'Maqsadingizga erishish uchun {diff} kg qoldi.',
+    remainingDescGain: 'Maqsadingizga erishish uchun {diff} kg semirishingiz kerak.',
+    atTargetWeight: 'Siz ayni maqsad qilgan vazndasiz!',
+    dailyCalorieTarget: 'Kunlik kaloriya maqsadi',
+    calorieTargetDesc: 'Kunlik maqsadingizni sozlang yoki maqsadli vazningizga asoslangan tavsiyamizdan foydalaning.',
+    weeklyChangeRate: 'Haftalik o\'zgarish tezligi',
+    kgWk: '{rate} kg/hafta',
+    dailyCaloriesLabel: 'Kunlik kaloriya (kkal)',
+    suggested: 'Tavsiya etilgan',
+    timeline: 'Muddat',
+    timelineDesc: 'Kunlik majburiyatingizni hisoblash uchun maqsadli tugatish sanasini tanlang.',
+    targetDateLabel: 'Maqsadli sana',
+    daysRemainingDesc: 'Maqsadingizga taxminan {days} kun qoldi.',
+    motivationQuote: '"Har bir kichik qadam sizni maqsadingizga yaqinlashtiradi."',
+    motivationAuthor: 'Salomatlik yo\'li',
+    resetGoal: 'Maqsadni tiklash',
+    saveGoal: 'Maqsadni saqlash',
+    
+    resetMsg: 'Maqsad sozlamalari boshlang\'ich holatga qaytarildi.',
+    saveSuccess: 'Maqsadlar muvaffaqiyatli saqlandi! 🎉',
+    validWeightErr: 'Iltimos, to\'g\'ri maqsadli vaznni kiriting.',
+    calorieErr: 'Kunlik kaloriya maqsadi kamida 800 kkal bo\'lishi kerak.',
+    confirmTargetDate: 'Sanani tasdiqlash',
+    done: 'Tayyor',
+  }
+};
+
 export default function GoalSettingScreen() {
-  const colorScheme = useColorScheme();
-  const isDark = false; // Force light mode to match the rest of the app
+  const [appTheme, setAppTheme] = useState(MockStore.appTheme);
+  const [language, setLanguage] = useState(MockStore.language);
+
+  // Subscribe to MockStore updates
+  useEffect(() => {
+    return MockStore.subscribe(() => {
+      setTargetWeight(MockStore.targetWeight.toString());
+      setDailyCalorieGoal(MockStore.dailyCalorieGoal.toString());
+      setWeeklyWeightGoal(MockStore.weeklyWeightGoal);
+      setTargetDate(MockStore.targetDate);
+      setAppTheme(MockStore.appTheme);
+      setLanguage(MockStore.language);
+    });
+  }, []);
+
+  const systemColorScheme = useColorScheme();
+  const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
+  const t = translations[language] || translations.en;
 
   // Theme Colors
   const theme = {
-    background: '#F7FAF3', // Matches home page background color
-    cardBackground: '#FFFFFF',
-    cardBorder: '#EBF2E5',
-    textPrimary: '#1A2310',
-    textBrand: '#3A5C18',
-    textMuted: '#6B785E',
-    badgeBackground: '#F0FAE4',
-    badgeBorder: '#C8E8A0',
-    inputText: '#1A2310',
-    inputBackground: '#FFFFFF',
-    inputOutline: '#EBF2E5',
-    suggestedBoxBg: '#F5F5F5',
+    background: isDark ? '#0F140A' : '#F7FAF3',
+    cardBackground: isDark ? '#171E10' : '#FFFFFF',
+    cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A2310',
+    textBrand: isDark ? '#8CC33F' : '#3A5C18',
+    textMuted: isDark ? '#9AA88E' : '#6B785E',
+    badgeBackground: isDark ? '#23321A' : '#F0FAE4',
+    badgeBorder: isDark ? '#374B2A' : '#C8E8A0',
+    inputText: isDark ? '#FAFCF8' : '#1A2310',
+    inputBackground: isDark ? '#171E10' : '#FFFFFF',
+    inputOutline: isDark ? '#2A3A1E' : '#EBF2E5',
+    suggestedBoxBg: isDark ? '#23321A' : '#F5F5F5',
   };
 
   // Goal Settings State (Synced with MockStore)
@@ -57,16 +186,6 @@ export default function GoalSettingScreen() {
   const [snackbarVisible, setSnackbarVisible] = useState<boolean>(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
-
-  // Subscribe to MockStore updates
-  useEffect(() => {
-    return MockStore.subscribe(() => {
-      setTargetWeight(MockStore.targetWeight.toString());
-      setDailyCalorieGoal(MockStore.dailyCalorieGoal.toString());
-      setWeeklyWeightGoal(MockStore.weeklyWeightGoal);
-      setTargetDate(MockStore.targetDate);
-    });
-  }, []);
 
   const parsedTargetWeight = parseFloat(targetWeight) || 0;
   const weightDiff = CURRENT_WEIGHT - parsedTargetWeight;
@@ -115,30 +234,50 @@ export default function GoalSettingScreen() {
     setTargetWeight((Math.round(newVal * 10) / 10).toString());
   };
 
-  const handleSaveGoal = () => {
+  const handleSaveGoal = async () => {
     if (parsedTargetWeight <= 0) {
-      setSnackbarMessage('Please enter a valid target weight.');
+      setSnackbarMessage(t.validWeightErr);
       setSnackbarVisible(true);
       return;
     }
     if ((parseFloat(dailyCalorieGoal) || 0) < 800) {
-      setSnackbarMessage('Daily calorie goal must be at least 800 kcal.');
+      setSnackbarMessage(t.calorieErr);
       setSnackbarVisible(true);
       return;
     }
 
     setIsSaving(true);
-    setTimeout(() => {
+    try {
+      const parsedCalories = parseFloat(dailyCalorieGoal) || 1900;
+
+      // Save to MockStore
       MockStore.update({
         targetWeight: parsedTargetWeight,
-        dailyCalorieGoal: parseFloat(dailyCalorieGoal) || 1900,
+        dailyCalorieGoal: parsedCalories,
         weeklyWeightGoal: weeklyWeightGoal,
         targetDate: targetDate,
       });
-      setIsSaving(false);
-      setSnackbarMessage('Goals saved successfully! 🎉');
+
+      // Save to Supabase profiles table
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({
+          target_weight: parsedTargetWeight,
+          daily_calorie_goal: parsedCalories,
+          weekly_weight_goal: weeklyWeightGoal,
+          target_date: targetDate.toISOString(),
+        }).eq('id', user.id);
+      }
+
+      setSnackbarMessage(t.saveSuccess);
       setSnackbarVisible(true);
-    }, 1200);
+    } catch (err) {
+      console.warn('Failed to save goals to DB:', err);
+      setSnackbarMessage(t.saveSuccess);
+      setSnackbarVisible(true);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleResetGoal = () => {
@@ -157,12 +296,12 @@ export default function GoalSettingScreen() {
       targetDate: defaultDate,
     });
     
-    setSnackbarMessage('Goal settings reset to defaults.');
+    setSnackbarMessage(t.resetMsg);
     setSnackbarVisible(true);
   };
 
   const formatDateString = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString(language === 'uz' ? 'uz-UZ' : language === 'ru' ? 'ru-RU' : 'en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -190,8 +329,8 @@ export default function GoalSettingScreen() {
                 </View>
                 <View style={styles.pulseRing} />
               </View>
-              <Text style={[styles.title, { color: theme.textBrand }]}>Set Your Goal</Text>
-              <Text style={[styles.subtitle, { color: theme.textMuted }]}>Track your progress and stay motivated.</Text>
+              <Text style={[styles.title, { color: theme.textBrand }]}>{t.setGoal}</Text>
+              <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t.trackProgress}</Text>
             </Animated.View>
 
             {/* Goal Card */}
@@ -200,9 +339,9 @@ export default function GoalSettingScreen() {
               style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
             >
               <View style={styles.cardHeader}>
-                <Text style={[styles.cardTitle, { color: theme.textBrand }]}>Weight Goal</Text>
+                <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.weightGoal}</Text>
                 <View style={[styles.currentWeightBadge, { backgroundColor: theme.background, borderColor: theme.cardBorder }]}>
-                  <Text style={[styles.currentWeightLabel, { color: theme.textMuted }]}>Current: </Text>
+                  <Text style={[styles.currentWeightLabel, { color: theme.textMuted }]}>{t.current}</Text>
                   <Text style={[styles.currentWeightValue, { color: theme.textBrand }]}>{CURRENT_WEIGHT} kg</Text>
                 </View>
               </View>
@@ -220,7 +359,7 @@ export default function GoalSettingScreen() {
                 <View style={styles.inputContainer}>
                   <PaperTextInput
                     mode="outlined"
-                    label="Target Weight (kg)"
+                    label={t.targetWeightLabel}
                     value={targetWeight}
                     onChangeText={setTargetWeight}
                     keyboardType="decimal-pad"
@@ -251,8 +390,10 @@ export default function GoalSettingScreen() {
                 />
                 <Text style={[styles.diffText, { color: theme.textBrand }]}>
                   {absWeightDiff === 0 
-                    ? "Weight maintenance target" 
-                    : `${absWeightDiff.toFixed(1)} kg ${isLoss ? 'remaining' : 'to gain'} to reach goal`
+                    ? t.maintenance
+                    : isLoss
+                      ? t.remainingToLoss.replace('{diff}', absWeightDiff.toFixed(1))
+                      : t.remainingToGain.replace('{diff}', absWeightDiff.toFixed(1))
                   }
                 </Text>
               </Animated.View>
@@ -264,8 +405,8 @@ export default function GoalSettingScreen() {
               style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
             >
               <View style={styles.progressHeader}>
-                <Text style={[styles.progressTitle, { color: theme.textBrand }]}>Goal Progress</Text>
-                <Text style={styles.progressPctText}>{Math.round(progressPercent)}% Completed</Text>
+                <Text style={[styles.progressTitle, { color: theme.textBrand }]}>{t.goalProgress}</Text>
+                <Text style={styles.progressPctText}>{Math.round(progressPercent)}% {t.completed}</Text>
               </View>
 
               <View style={[styles.progressBarBackground, { backgroundColor: theme.badgeBackground }]}>
@@ -278,8 +419,10 @@ export default function GoalSettingScreen() {
                 <Ionicons name="information-circle-outline" size={16} color={theme.textMuted} />
                 <Text style={[styles.progressFooterText, { color: theme.textMuted }]}>
                   {absWeightDiff === 0 
-                    ? "You are exactly at your target weight!"
-                    : `${absWeightDiff.toFixed(1)} kg remaining to reach your goal.`
+                    ? t.atTargetWeight
+                    : isLoss
+                      ? t.remainingDescLoss.replace('{diff}', absWeightDiff.toFixed(1))
+                      : t.remainingDescGain.replace('{diff}', absWeightDiff.toFixed(1))
                   }
                 </Text>
               </View>
@@ -290,12 +433,10 @@ export default function GoalSettingScreen() {
               entering={FadeInDown.duration(500).delay(300)} 
               style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
             >
-              <Text style={[styles.cardTitle, { color: theme.textBrand }]}>Daily Calorie Target</Text>
-              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>
-                Customize your daily target or use our suggestion based on your target weight.
-              </Text>
+              <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.dailyCalorieTarget}</Text>
+              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t.calorieTargetDesc}</Text>
 
-              <Text style={[styles.subLabel, { color: theme.textBrand }]}>Weekly Change Rate</Text>
+              <Text style={[styles.subLabel, { color: theme.textBrand }]}>{t.weeklyChangeRate}</Text>
               <View style={styles.chipContainer}>
                 {[0.25, 0.5, 0.75, 1.0].map((rate) => {
                   const isSelected = weeklyWeightGoal === rate;
@@ -307,7 +448,7 @@ export default function GoalSettingScreen() {
                       activeOpacity={0.8}
                     >
                       <Text style={[styles.chipText, { color: theme.textMuted }, isSelected && styles.chipTextActive]}>
-                        {rate} kg/wk
+                        {t.kgWk.replace('{rate}', rate.toString())}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -319,7 +460,7 @@ export default function GoalSettingScreen() {
                 <View style={styles.flexInput}>
                   <PaperTextInput
                     mode="outlined"
-                    label="Daily Calories (kcal)"
+                    label={t.dailyCaloriesLabel}
                     value={dailyCalorieGoal}
                     onChangeText={setDailyCalorieGoal}
                     keyboardType="number-pad"
@@ -331,7 +472,7 @@ export default function GoalSettingScreen() {
                   />
                 </View>
                 <View style={[styles.suggestedBox, { backgroundColor: theme.suggestedBoxBg, borderColor: theme.cardBorder }]}>
-                  <Text style={[styles.suggestedLabel, { color: theme.textMuted }]}>Suggested</Text>
+                  <Text style={[styles.suggestedLabel, { color: theme.textMuted }]}>{t.suggested}</Text>
                   <Text style={styles.suggestedValue}>{suggestedCalories} kcal</Text>
                 </View>
               </View>
@@ -342,10 +483,8 @@ export default function GoalSettingScreen() {
               entering={FadeInDown.duration(500).delay(400)} 
               style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
             >
-              <Text style={[styles.cardTitle, { color: theme.textBrand }]}>Timeline</Text>
-              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>
-                Pick your target completion date to calculate your required daily commitment.
-              </Text>
+              <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.timeline}</Text>
+              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t.timelineDesc}</Text>
 
               <TouchableOpacity 
                 style={[styles.datePickerTrigger, { backgroundColor: theme.badgeBackground, borderColor: theme.badgeBorder }]}
@@ -355,7 +494,7 @@ export default function GoalSettingScreen() {
                 <View style={styles.dateInfo}>
                   <Ionicons name="calendar" size={22} color="#7EB93C" />
                   <View style={{ marginLeft: 12 }}>
-                    <Text style={[styles.datePickerLabel, { color: theme.textMuted }]}>Target Date</Text>
+                    <Text style={[styles.datePickerLabel, { color: theme.textMuted }]}>{t.targetDateLabel}</Text>
                     <Text style={styles.datePickerValue}>{formatDateString(targetDate)}</Text>
                   </View>
                 </View>
@@ -379,7 +518,7 @@ export default function GoalSettingScreen() {
                     style={styles.webDateCloseBtn}
                     onPress={() => setShowDatePicker(false)}
                   >
-                    <Text style={styles.webDateCloseText}>Done</Text>
+                    <Text style={styles.webDateCloseText}>{t.done}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -402,7 +541,7 @@ export default function GoalSettingScreen() {
                       onPress={() => setShowDatePicker(false)}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.iosConfirmButtonText}>Confirm Target Date</Text>
+                      <Text style={styles.iosConfirmButtonText}>{t.confirmTargetDate}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -412,7 +551,7 @@ export default function GoalSettingScreen() {
               <View style={[styles.daysRemainingContainer, { backgroundColor: theme.badgeBackground }]}>
                 <Ionicons name="time-outline" size={20} color="#7EB93C" />
                 <Text style={[styles.daysRemainingText, { color: theme.textBrand }]}>
-                  Estimated <Text style={styles.daysRemainingBold}>{daysRemaining} days</Text> remaining to your target.
+                  {t.daysRemainingDesc.replace('{days}', daysRemaining.toString())}
                 </Text>
               </View>
             </Animated.View>
@@ -425,12 +564,10 @@ export default function GoalSettingScreen() {
               <View style={styles.quoteIconContainer}>
                 <MaterialCommunityIcons name="format-quote-close" size={24} color="#EBF2E5" style={{ opacity: 0.3 }} />
               </View>
-              <Text style={styles.motivationText}>
-                {"\"Every small step brings you closer to your goal.\""}
-              </Text>
+              <Text style={styles.motivationText}>{t.motivationQuote}</Text>
               <View style={styles.motivationFooter}>
                 <View style={styles.motivationDot} />
-                <Text style={styles.motivationAuthor}>Fitness Journey</Text>
+                <Text style={styles.motivationAuthor}>{t.motivationAuthor}</Text>
               </View>
             </Animated.View>
 
@@ -444,7 +581,7 @@ export default function GoalSettingScreen() {
                 onPress={handleResetGoal}
                 activeOpacity={0.7}
               >
-                <Text style={styles.resetButtonText}>Reset Goal</Text>
+                <Text style={styles.resetButtonText}>{t.resetGoal}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
@@ -458,7 +595,7 @@ export default function GoalSettingScreen() {
                 ) : (
                   <>
                     <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.saveButtonText}>Save Goal</Text>
+                    <Text style={styles.saveButtonText}>{t.saveGoal}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -472,7 +609,7 @@ export default function GoalSettingScreen() {
             onDismiss={() => setSnackbarVisible(false)}
             duration={2500}
             action={{
-              label: 'Dismiss',
+              label: t.done,
               onPress: () => setSnackbarVisible(false),
               textColor: '#7EB93C',
             }}

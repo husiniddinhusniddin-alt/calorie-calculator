@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -20,19 +20,109 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { StatusBar } from 'expo-status-bar';
-import { Calendar } from 'react-native-calendars';
+import { useColorScheme } from 'react-native';
 import { MockStore } from '@/constants/store';
 
-const getFormattedDate = (dateString: string) => {
-  const [year, month, day] = dateString.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  return {
-    dayName: days[date.getDay()],
-    fullDate: `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
-  };
+const translations = {
+  en: {
+    monday: 'Monday',
+    nov24: 'Nov 24, 2025',
+    dailyCalorieTarget: 'Daily Calorie Target',
+    ofKcal: 'of {goal} Kcal',
+    addFood: 'Add food',
+    carbs: 'Carbs',
+    protein: 'Protein',
+    fat: 'Fat',
+    ofGr: 'of {max} gr',
+    calorieTrends: 'Calorie Trends',
+    day: 'Day',
+    week: 'Week',
+    month: 'Month',
+    noProducts: 'No products added yet',
+    breakfast: 'Breakfast',
+    lunch: 'Lunch',
+    dinner: 'Dinner',
+    snack: 'Snack',
+    aiIdentifiedFood: 'AI Identified Food',
+    success: 'Success',
+    photoCaptured: 'Photo captured successfully! AI is analyzing your food...',
+    permissionRequired: 'Permission required',
+    cameraPermission: 'Camera permission is required to add food via photos!',
+    error: 'Error',
+    couldNotOpen: 'Could not open camera. Ensure you are on a physical device and the app was restarted after installing the camera module.',
+    addToWhichMeal: 'Add to which meal?',
+    updateDailyGoal: 'Update Daily Goal',
+    cancel: 'Cancel',
+    save: 'Save',
+    oatmealText: 'Oatmeal with fruits and nuts',
+    chopsText: 'Chops with potatoes',
+  },
+  ru: {
+    monday: 'Понедельник',
+    nov24: '24 нояб. 2025 г.',
+    dailyCalorieTarget: 'Дневная цель калорий',
+    ofKcal: 'из {goal} ккал',
+    addFood: 'Добавить еду',
+    carbs: 'Углеводы',
+    protein: 'Белки',
+    fat: 'Жиры',
+    ofGr: 'из {max} г',
+    calorieTrends: 'Тренды калорий',
+    day: 'День',
+    week: 'Неделя',
+    month: 'Месяц',
+    noProducts: 'Продукты еще не добавлены',
+    breakfast: 'Завтрак',
+    lunch: 'Обед',
+    dinner: 'Ужин',
+    snack: 'Перекус',
+    aiIdentifiedFood: 'Еда, определенная ИИ',
+    success: 'Успех',
+    photoCaptured: 'Фото успешно сделано! ИИ анализирует еду...',
+    permissionRequired: 'Требуется разрешение',
+    cameraPermission: 'Разрешение на камеру требуется для добавления еды по фото!',
+    error: 'Ошибка',
+    couldNotOpen: 'Не удалось открыть камеру. Убедитесь, что вы используете реальное устройство.',
+    addToWhichMeal: 'В какой прием пищи?',
+    updateDailyGoal: 'Изменить дневную цель',
+    cancel: 'Отмена',
+    save: 'Сохранить',
+    oatmealText: 'Овсянка с фруктами и орехами',
+    chopsText: 'Отбивные с картофелем',
+  },
+  uz: {
+    monday: 'Dushanba',
+    nov24: '24-noy, 2025',
+    dailyCalorieTarget: 'Kunlik kaloriya maqsadi',
+    ofKcal: '{goal} Kcal dan',
+    addFood: 'Taom qo\'shish',
+    carbs: 'Uglevodlar',
+    protein: 'Oqsillar',
+    fat: 'Yog\'lar',
+    ofGr: '{max} gr dan',
+    calorieTrends: 'Kaloriya tendensiyalari',
+    day: 'Kun',
+    week: 'Hafta',
+    month: 'Oy',
+    noProducts: 'Hozircha mahsulot qo\'shilmagan',
+    breakfast: 'Nonushta',
+    lunch: 'Tushlik',
+    dinner: 'Kechki ovqat',
+    snack: 'Tamaddi',
+    aiIdentifiedFood: 'AI aniqlagan taom',
+    success: 'Muvaffaqiyat',
+    photoCaptured: 'Rasm muvaffaqiyatli olindi! AI taomingizni tahlil qilmoqda...',
+    permissionRequired: 'Ruxsat talab qilinadi',
+    cameraPermission: 'Rasm orqali taom qo\'shish uchun kameraga ruxsat berilishi kerak!',
+    error: 'Xatolik',
+    couldNotOpen: 'Kamerani ochib bo\'lmadi. Qurilmada ishlayotganingizni va kamera sozlamalari to\'g\'ri ekanligini tekshiring.',
+    addToWhichMeal: 'Qaysi taomga qo\'shilsin?',
+    updateDailyGoal: 'Kunlik maqsadni o\'zgartirish',
+    cancel: 'Bekor qilish',
+    save: 'Saqlash',
+    oatmealText: 'Mevalar va yong\'oqlar bilan suli bo\'tqasi',
+    chopsText: 'Kartoshka bilan otbivnoy',
+  }
 };
 
 const DIARY_MEALS = [
@@ -154,23 +244,38 @@ const DashedGauge = ({ percentage, radius, strokeWidth, filledColor, unfilledCol
 
 export default function DiaryScreen() {
   const router = useRouter();
-  const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
-
+  
+  const [appTheme, setAppTheme] = useState(MockStore.appTheme);
+  const [language, setLanguage] = useState(MockStore.language);
+  const [dailyGoal, setDailyGoal] = useState(MockStore.dailyCalorieGoal);
+  
   useEffect(() => {
     return MockStore.subscribe(() => {
-      setProfileImage(MockStore.profileImage);
+      setAppTheme(MockStore.appTheme);
+      setLanguage(MockStore.language);
+      setDailyGoal(MockStore.dailyCalorieGoal);
     });
   }, []);
 
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    const offset = today.getTimezoneOffset() * 60000;
-    return new Date(today.getTime() - offset).toISOString().split('T')[0];
-  });
-  const [isCalendarModalVisible, setCalendarModalVisible] = useState(false);
-  const [meals, setMeals] = useState(DIARY_MEALS);
-  const [dailyGoal, setDailyGoal] = useState(DEFAULT_DAILY_GOAL);
-  const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('week');
+  const systemColorScheme = useColorScheme();
+  const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
+  const t = translations[language] || translations.en;
+
+  const theme = {
+    background: isDark ? '#0F140A' : '#F7FAF3',
+    cardBackground: isDark ? '#171E10' : '#FFFFFF',
+    cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A1A1A',
+    textSecondary: isDark ? '#9AA88E' : '#555',
+    textMuted: isDark ? '#6B785E' : '#888',
+    pillBackground: isDark ? '#23321A' : '#FFFFFF',
+    gaugeUnfilled: isDark ? '#2A3A1E' : '#EAEAEA',
+    macroRingBg: isDark ? '#2A3A1E' : '#F0F0F0',
+    mealBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    mealEmptyText: isDark ? '#5A684E' : '#BBBBBB',
+  };
+
+  const [meals, setMeals] = useState<any[]>(DIARY_MEALS);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [tempGoal, setTempGoal] = useState(dailyGoal.toString());
   const [selectedMealType, setSelectedMealType] = useState<string | null>(null);
@@ -180,59 +285,30 @@ export default function DiaryScreen() {
   const [scannedResult, setScannedResult] = useState<any>(null);
   const cameraRef = useRef<CameraView>(null);
 
-  const scanLinePosition = useSharedValue(0);
-  const resultTransition = useSharedValue(0);
-
   useEffect(() => {
-    if (scannerStep === 'processing' && resultTransition.value === 0) {
-      scanLinePosition.value = withRepeat(
-        withTiming(250, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        -1,
-        true
-      );
-    } else {
-      scanLinePosition.value = 0;
-    }
-  }, [scannerStep]);
-
-  const scanLineStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: scanLinePosition.value }],
-  }));
-
-  const animatedImageWrapperStyle = useAnimatedStyle(() => ({
-    height: interpolate(resultTransition.value, [0, 1], [SCREEN_HEIGHT, SCREEN_HEIGHT * 0.45]),
-  }));
-
-  const animatedScanningOverlayStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(resultTransition.value, [0, 1], [1, 0]),
-  }));
-
-  const animatedDetailsOpacityStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(resultTransition.value, [0, 0.8, 1], [0, 0, 1]),
-  }));
-
-  const animatedBottomSheetStyle = useAnimatedStyle(() => ({
-    transform: [{
-      translateY: interpolate(resultTransition.value, [0, 1], [SCREEN_HEIGHT * 0.6, 0])
-    }],
-  }));
+    setTempGoal(dailyGoal.toString());
+  }, [dailyGoal]);
 
   const totalCalories = meals.reduce((sum, m) => sum + m.calories, 0);
 
-  const handleDateSelect = (day: any) => {
-    setSelectedDate(day.dateString);
-    setCalendarModalVisible(false);
-    
-    const today = new Date();
-    const offset = today.getTimezoneOffset() * 60000;
-    const todayStr = new Date(today.getTime() - offset).toISOString().split('T')[0];
-    
-    if (day.dateString === todayStr) {
-      setMeals(DIARY_MEALS);
-    } else {
-      let hash = 0;
-      for (let i = 0; i < day.dateString.length; i++) {
-        hash = day.dateString.charCodeAt(i) + ((hash << 5) - hash);
+  const localizedMeals = meals.map(meal => ({
+    ...meal,
+    label: t[meal.id as keyof typeof t] || meal.label,
+    items: meal.items.map((item: string) => {
+      if (item === 'Oatmeal with fruits and nuts') return t.oatmealText;
+      if (item === 'Chops with potatoes') return t.chopsText;
+      if (item === 'AI Identified Food') return t.aiIdentifiedFood;
+      return item;
+    })
+  }));
+
+  const handleAddFood = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (permissionResult.granted === false) {
+        Alert.alert(t.permissionRequired, t.cameraPermission);
+        return;
       }
       const randomMultiplier = Math.abs(hash % 10) / 10 + 0.5;
       setMeals(DIARY_MEALS.map(m => ({
@@ -244,13 +320,25 @@ export default function DiaryScreen() {
     }
   };
 
-  const handleAddFood = async () => {
-    if (!cameraPermission?.granted) {
-      const permissionResult = await requestCameraPermission();
-      if (!permissionResult.granted) {
-        Alert.alert("Permission required", "Camera permission is required to scan food.");
-        return;
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        Alert.alert(t.success, t.photoCaptured);
+        setTimeout(() => {
+          setPendingFood({
+            name: 'AI Identified Food',
+            calories: Math.floor(Math.random() * 300) + 100
+          });
+          setMealSelectorVisible(true);
+        }, 1500);
       }
+    } catch (error) {
+      Alert.alert(t.error, t.couldNotOpen);
+      console.log(error);
     }
     setScannerStep('camera');
     setScannedResult(null);
@@ -259,55 +347,47 @@ export default function DiaryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Top Row */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <View style={styles.headerTopRow}>
-            <TouchableOpacity 
-              activeOpacity={0.7} 
-              style={styles.datePill}
-              onPress={() => setCalendarModalVisible(true)}
-            >
-              <View style={styles.dateIconContainer}>
-                <Ionicons name="calendar-outline" size={18} color="#333" />
+            <View style={[styles.datePill, { backgroundColor: theme.pillBackground }]}>
+              <View style={[styles.dateIconContainer, { borderColor: theme.macroRingBg }]}>
+                <Ionicons name="calendar-outline" size={18} color={theme.textPrimary} />
               </View>
               <View>
-                <Text style={styles.dateDay}>{getFormattedDate(selectedDate).dayName}</Text>
-                <Text style={styles.dateFull}>{getFormattedDate(selectedDate).fullDate}</Text>
+                <Text style={[styles.dateDay, { color: theme.textPrimary }]}>{t.monday}</Text>
+                <Text style={[styles.dateFull, { color: theme.textMuted }]}>{t.nov24}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity 
               activeOpacity={0.7}
               onPress={() => router.push('/profile')}
             >
-              <View style={[styles.avatarContainer, !profileImage && { backgroundColor: '#F0FAE4' }]}>
-                {profileImage ? (
-                  <Image source={{ uri: profileImage }} style={{ width: 48, height: 48, borderRadius: 24 }} />
-                ) : (
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#7EB93C' }}>AG</Text>
-                )}
+              <View style={[styles.avatarContainer, { backgroundColor: theme.pillBackground }]}>
+                <Image source={{ uri: 'https://cdn3d.iconscout.com/3d/premium/thumb/woman-avatar-5822527-4898516.png' }} style={{ width: 44, height: 44, borderRadius: 22 }} />
               </View>
             </TouchableOpacity>
           </View>
         </Animated.View>
 
         {/* Daily Calorie Target Gauge */}
-        <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.targetCard}>
+        <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.targetCard, { backgroundColor: theme.cardBackground }]}>
           <TouchableOpacity 
-            style={styles.editTargetBtn}
+            style={[styles.editTargetBtn, { backgroundColor: theme.pillBackground }]}
             onPress={() => {
               setTempGoal(dailyGoal.toString());
               setEditModalVisible(true);
             }}
           >
-            <Ionicons name="pencil" size={16} color="#888" />
+            <Ionicons name="pencil" size={16} color={theme.textMuted} />
           </TouchableOpacity>
 
-          <View style={styles.targetPill}>
-            <Text style={styles.targetPillText}>Daily-Calorie Target</Text>
+          <View style={[styles.targetPill, { borderColor: theme.macroRingBg }]}>
+            <Text style={[styles.targetPillText, { color: theme.textSecondary }]}>{t.dailyCalorieTarget}</Text>
           </View>
           
           <View style={styles.gaugeWrapper}>
@@ -316,11 +396,11 @@ export default function DiaryScreen() {
               radius={120}
               strokeWidth={24}
               filledColor="#7EB93C"
-              unfilledColor="#EAEAEA"
+              unfilledColor={theme.gaugeUnfilled}
             />
             <View style={styles.gaugeCenter}>
-              <Text style={styles.gaugeValue}>{totalCalories}</Text>
-              <Text style={styles.gaugeTotal}>of {dailyGoal} Kcal</Text>
+              <Text style={[styles.gaugeValue, { color: theme.textPrimary }]}>{totalCalories}</Text>
+              <Text style={[styles.gaugeTotal, { color: theme.textMuted }]}>{t.ofKcal.replace('{goal}', dailyGoal.toString())}</Text>
             </View>
           </View>
         </Animated.View>
@@ -329,91 +409,86 @@ export default function DiaryScreen() {
         <Animated.View entering={FadeInDown.duration(500).delay(125)}>
           <TouchableOpacity style={styles.addFoodBtn} activeOpacity={0.8} onPress={handleAddFood}>
             <Ionicons name="camera" size={22} color="#FFFFFF" />
-            <Text style={styles.addFoodBtnText}>Add food</Text>
+            <Text style={styles.addFoodBtnText}>{t.addFood}</Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* Macros Row */}
         <Animated.View entering={FadeInDown.duration(500).delay(150)} style={styles.macrosRow}>
-          <View style={styles.macroCard}>
+          <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.macroRingWrapper}>
-              <View style={[styles.macroRingBg, { borderColor: '#EAEAEA' }]} />
+              <View style={[styles.macroRingBg, { borderColor: theme.macroRingBg }]} />
               <View style={[styles.macroRingFill, { borderTopColor: '#F4C344', borderRightColor: 'transparent', transform: [{ rotate: '45deg' }] }]} />
               <MaterialCommunityIcons name="corn" size={24} color="#F4C344" />
             </View>
-            <Text style={styles.macroVal}>25</Text>
-            <Text style={styles.macroTotal}>of 50 gr</Text>
-            <View style={styles.macroNamePill}>
-              <Text style={styles.macroNameText}>Carbs</Text>
+            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>25</Text>
+            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', '50')}</Text>
+            <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
+              <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.carbs}</Text>
             </View>
           </View>
-          <View style={styles.macroCard}>
+          <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.macroRingWrapper}>
-              <View style={[styles.macroRingBg, { borderColor: '#EAEAEA' }]} />
+              <View style={[styles.macroRingBg, { borderColor: theme.macroRingBg }]} />
               <View style={[styles.macroRingFill, { borderTopColor: '#C93A3E', borderRightColor: '#C93A3E', transform: [{ rotate: '45deg' }] }]} />
               <MaterialCommunityIcons name="food-steak" size={24} color="#C93A3E" />
             </View>
-            <Text style={styles.macroVal}>63</Text>
-            <Text style={styles.macroTotal}>of 103 gr</Text>
-            <View style={styles.macroNamePill}>
-              <Text style={styles.macroNameText}>Protein</Text>
+            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>63</Text>
+            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', '103')}</Text>
+            <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
+              <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.protein}</Text>
             </View>
           </View>
-          <View style={styles.macroCard}>
+          <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.macroRingWrapper}>
-              <View style={[styles.macroRingBg, { borderColor: '#EAEAEA' }]} />
+              <View style={[styles.macroRingBg, { borderColor: theme.macroRingBg }]} />
               <View style={[styles.macroRingFill, { borderTopColor: '#E8A86F', borderRightColor: 'transparent', transform: [{ rotate: '0deg' }] }]} />
               <Ionicons name="water" size={24} color="#E8A86F" />
             </View>
-            <Text style={styles.macroVal}>12</Text>
-            <Text style={styles.macroTotal}>of 43 gr</Text>
-            <View style={styles.macroNamePill}>
-              <Text style={styles.macroNameText}>Fat</Text>
+            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>12</Text>
+            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', '43')}</Text>
+            <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
+              <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.fat}</Text>
             </View>
           </View>
         </Animated.View>
 
         {/* Calorie Trends Chart */}
-        <Animated.View entering={FadeInDown.duration(500).delay(200)} style={styles.chartCard}>
+        <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[styles.chartCard, { backgroundColor: theme.cardBackground }]}>
           <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>Calorie Trends</Text>
-            <View style={styles.chartTabs}>
-              <TouchableOpacity 
-                style={[styles.chartTab, activeTrendTab === 'day' && styles.chartTabActive]}
-                onPress={() => setActiveTrendTab('day')}
-              >
-                <Text style={[styles.chartTabText, activeTrendTab === 'day' && styles.chartTabTextActive]}>Day</Text>
+            <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>{t.calorieTrends}</Text>
+            <View style={[styles.chartTabs, { backgroundColor: theme.pillBackground }]}>
+              <TouchableOpacity style={[styles.chartTab, styles.chartTabActive]}>
+                <Text style={[styles.chartTabText, styles.chartTabTextActive]}>{t.day}</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.chartTab, activeTrendTab === 'week' && styles.chartTabActive]}
-                onPress={() => setActiveTrendTab('week')}
-              >
-                <Text style={[styles.chartTabText, activeTrendTab === 'week' && styles.chartTabTextActive]}>Week</Text>
+              <TouchableOpacity style={styles.chartTab}>
+                <Text style={[styles.chartTabText, { color: theme.textMuted }]}>{t.week}</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.chartTab, activeTrendTab === 'month' && styles.chartTabActive]}
-                onPress={() => setActiveTrendTab('month')}
-              >
-                <Text style={[styles.chartTabText, activeTrendTab === 'month' && styles.chartTabTextActive]}>Month</Text>
+              <TouchableOpacity style={styles.chartTab}>
+                <Text style={[styles.chartTabText, { color: theme.textMuted }]}>{t.month}</Text>
               </TouchableOpacity>
             </View>
           </View>
           
           <View style={styles.chartBody}>
             <View style={styles.yAxis}>
-              {Array.from({ length: 7 }, (_, i) => Math.round(TRENDS_DATA[activeTrendTab].max - (TRENDS_DATA[activeTrendTab].max / 6) * i)).map((val, idx) => (
-                <Text key={idx} style={styles.yAxisText}>{val}</Text>
-              ))}
+              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>3000</Text>
+              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>2500</Text>
+              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>2000</Text>
+              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>1500</Text>
+              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>1000</Text>
+              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>500</Text>
+              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>0</Text>
             </View>
             
             <View style={styles.barsContainer}>
               {TRENDS_DATA[activeTrendTab].data.map((item) => (
                 <View key={item.label} style={styles.barCol}>
                   <View style={styles.barWrapper}>
-                    <View style={styles.barTrack} />
-                    <View style={[styles.barFill, { height: `${(item.value / TRENDS_DATA[activeTrendTab].max) * 100}%` }]} />
+                    <View style={[styles.barTrack, { backgroundColor: theme.pillBackground }]} />
+                    <View style={[styles.barFill, { height: `${(item.value / MAX_TREND) * 100}%` }]} />
                   </View>
-                  <Text style={styles.xAxisText}>{item.label}</Text>
+                  <Text style={[styles.xAxisText, { color: theme.textMuted }]}>{item.day}</Text>
                 </View>
               ))}
             </View>
@@ -421,18 +496,18 @@ export default function DiaryScreen() {
         </Animated.View>
 
         {/* Meal Sections */}
-        {meals.map((meal, index) => (
+        {localizedMeals.map((meal, index) => (
           <Animated.View
             key={meal.id}
             entering={FadeInDown.duration(500).delay(150 + index * 80)}
           >
-            <TouchableOpacity activeOpacity={0.85} style={styles.mealCard}>
+            <TouchableOpacity activeOpacity={0.85} style={[styles.mealCard, { backgroundColor: theme.cardBackground, borderColor: theme.mealBorder }]}>
               {/* Left color stripe */}
               <View style={[styles.mealStripe, { backgroundColor: meal.color }]} />
 
               <View style={styles.mealContent}>
                 <View style={styles.mealHeader}>
-                  <Text style={styles.mealLabel}>{meal.label}</Text>
+                  <Text style={[styles.mealLabel, { color: theme.textPrimary }]}>{meal.label}</Text>
                   {meal.calories > 0 && (
                     <View style={[styles.mealCalBadge, { backgroundColor: meal.color + '22' }]}>
                       <Text style={[styles.mealCalBadgeText, { color: meal.color }]}>
@@ -443,10 +518,10 @@ export default function DiaryScreen() {
                 </View>
 
                 {meal.empty ? (
-                  <Text style={styles.mealEmptyText}>No products added yet</Text>
+                  <Text style={[styles.mealEmptyText, { color: theme.mealEmptyText }]}>{t.noProducts}</Text>
                 ) : (
-                  meal.items.map((item, i) => (
-                    <Text key={i} style={styles.mealItemText}>• {item}</Text>
+                  meal.items.map((item: string, i: number) => (
+                    <Text key={i} style={[styles.mealItemText, { color: theme.textSecondary }]}>• {item}</Text>
                   ))
                 )}
               </View>
@@ -463,27 +538,27 @@ export default function DiaryScreen() {
       {/* Edit Goal Modal */}
       <Modal visible={isEditModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Update Daily Goal</Text>
+          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5 }]}>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{t.updateDailyGoal}</Text>
             <TextInput
-              style={styles.modalInput}
+              style={[styles.modalInput, { backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
               keyboardType="numeric"
               value={tempGoal}
               onChangeText={setTempGoal}
               autoFocus
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setEditModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+              <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: theme.pillBackground }]} onPress={() => setEditModalVisible(false)}>
+                <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSaveBtn} onPress={() => {
                 const newGoal = parseInt(tempGoal, 10);
                 if (!isNaN(newGoal) && newGoal > 0) {
-                  setDailyGoal(newGoal);
+                  MockStore.update({ dailyCalorieGoal: newGoal });
                 }
                 setEditModalVisible(false);
               }}>
-                <Text style={styles.modalSaveText}>Save</Text>
+                <Text style={styles.modalSaveText}>{t.save}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -495,20 +570,37 @@ export default function DiaryScreen() {
       {/* Calendar Modal */}
       <Modal visible={isCalendarModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { padding: 0, overflow: 'hidden' }]}>
-            <Calendar
-              current={selectedDate}
-              onDayPress={handleDateSelect}
-              markedDates={{
-                [selectedDate]: { selected: true, selectedColor: '#7EB93C' }
-              }}
-              theme={{
-                todayTextColor: '#7EB93C',
-                arrowColor: '#7EB93C',
-              }}
-            />
-            <TouchableOpacity style={[styles.modalCancelBtn, { margin: 16 }]} onPress={() => setCalendarModalVisible(false)}>
-              <Text style={styles.modalCancelText}>Close</Text>
+          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5 }]}>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{t.addToWhichMeal}</Text>
+            {['breakfast', 'lunch', 'dinner', 'snack'].map((mealId) => {
+              const mealConfig = localizedMeals.find(m => m.id === mealId);
+              if (!mealConfig) return null;
+              return (
+                <TouchableOpacity 
+                  key={mealId} 
+                  style={[styles.mealSelectorBtn, { backgroundColor: mealConfig.color + '20' }]} 
+                  onPress={() => {
+                    setMeals(current => current.map(m => {
+                      if (m.id === mealId) {
+                        return {
+                          ...m,
+                          calories: m.calories + pendingFood.calories,
+                          items: [...m.items, pendingFood.name],
+                          empty: false
+                        };
+                      }
+                      return m;
+                    }));
+                    setMealSelectorVisible(false);
+                    setPendingFood(null);
+                  }}
+                >
+                  <Text style={[styles.mealSelectorBtnText, { color: mealConfig.color }]}>{mealConfig.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+            <TouchableOpacity style={[styles.modalCancelBtn, { marginTop: 12, width: '100%', backgroundColor: theme.pillBackground }]} onPress={() => setMealSelectorVisible(false)}>
+              <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1007,12 +1099,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#7EB93C',
   },
-  headerTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
