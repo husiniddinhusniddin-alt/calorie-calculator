@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,13 +9,31 @@ import {
   Modal,
   TextInput,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing, interpolate } from 'react-native-reanimated';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { StatusBar } from 'expo-status-bar';
+import { Calendar } from 'react-native-calendars';
+import { MockStore } from '@/constants/store';
+
+const getFormattedDate = (dateString: string) => {
+  const [year, month, day] = dateString.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  return {
+    dayName: days[date.getDay()],
+    fullDate: `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+  };
+};
 
 const DIARY_MEALS = [
   {
@@ -55,16 +73,54 @@ const DAILY_FATS = 43;
 const DAILY_CARBS = 50;
 const DAILY_PROTEINS = 103;
 
-const TRENDS_DATA = [
-  { day: 'MON', value: 1200 },
-  { day: 'TUE', value: 1400 },
-  { day: 'WED', value: 1250 },
-  { day: 'THU', value: 1700 },
-  { day: 'FRI', value: 1500 },
-  { day: 'SAT', value: 2000 },
-  { day: 'SUN', value: 1750 },
-];
-const MAX_TREND = 3000;
+const TRENDS_DATA = {
+  day: {
+    max: 1500,
+    data: [
+      { label: '8AM', value: 300 },
+      { label: '11AM', value: 250 },
+      { label: '2PM', value: 600 },
+      { label: '5PM', value: 200 },
+      { label: '8PM', value: 800 },
+      { label: '10PM', value: 0 },
+    ]
+  },
+  week: {
+    max: 3000,
+    data: [
+      { label: 'MON', value: 1200 },
+      { label: 'TUE', value: 1400 },
+      { label: 'WED', value: 1250 },
+      { label: 'THU', value: 1700 },
+      { label: 'FRI', value: 1500 },
+      { label: 'SAT', value: 2000 },
+      { label: 'SUN', value: 1750 },
+    ]
+  },
+  month: {
+    max: 2500,
+    data: [
+      { label: 'W1', value: 1400 },
+      { label: 'W2', value: 1600 },
+      { label: 'W3', value: 1550 },
+      { label: 'W4', value: 1800 },
+    ]
+  }
+};
+
+const MOCK_SCANNED_RESULT = {
+  image: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&q=80',
+  mealType: 'Breakfast',
+  title: 'Combo Cheesy Sunny Side-Up',
+  subtitle: 'With plain toast bread',
+  serving: 1,
+  calories: 475,
+  macros: { carbs: 15, protein: 35, fat: 23 },
+  ingredients: [
+    { name: 'Bread Toast', weight: '100gr', calories: 110, carbs: 50, protein: 8, fat: 1 },
+    { name: 'Fried Egg', weight: '100gr', calories: 201, carbs: 1, protein: 13, fat: 15 }
+  ]
+};
 
 const DashedGauge = ({ percentage, radius, strokeWidth, filledColor, unfilledColor }: any) => {
   const totalDashes = 45;
@@ -98,44 +154,108 @@ const DashedGauge = ({ percentage, radius, strokeWidth, filledColor, unfilledCol
 
 export default function DiaryScreen() {
   const router = useRouter();
+  const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
+
+  useEffect(() => {
+    return MockStore.subscribe(() => {
+      setProfileImage(MockStore.profileImage);
+    });
+  }, []);
+
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    const offset = today.getTimezoneOffset() * 60000;
+    return new Date(today.getTime() - offset).toISOString().split('T')[0];
+  });
+  const [isCalendarModalVisible, setCalendarModalVisible] = useState(false);
   const [meals, setMeals] = useState(DIARY_MEALS);
   const [dailyGoal, setDailyGoal] = useState(DEFAULT_DAILY_GOAL);
+  const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('week');
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [tempGoal, setTempGoal] = useState(dailyGoal.toString());
-  const [isMealSelectorVisible, setMealSelectorVisible] = useState(false);
-  const [pendingFood, setPendingFood] = useState<any>(null);
+  const [selectedMealType, setSelectedMealType] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scannerStep, setScannerStep] = useState<'camera' | 'processing'>('camera');
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [scannedResult, setScannedResult] = useState<any>(null);
+  const cameraRef = useRef<CameraView>(null);
+
+  const scanLinePosition = useSharedValue(0);
+  const resultTransition = useSharedValue(0);
+
+  useEffect(() => {
+    if (scannerStep === 'processing' && resultTransition.value === 0) {
+      scanLinePosition.value = withRepeat(
+        withTiming(250, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true
+      );
+    } else {
+      scanLinePosition.value = 0;
+    }
+  }, [scannerStep]);
+
+  const scanLineStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: scanLinePosition.value }],
+  }));
+
+  const animatedImageWrapperStyle = useAnimatedStyle(() => ({
+    height: interpolate(resultTransition.value, [0, 1], [SCREEN_HEIGHT, SCREEN_HEIGHT * 0.45]),
+  }));
+
+  const animatedScanningOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(resultTransition.value, [0, 1], [1, 0]),
+  }));
+
+  const animatedDetailsOpacityStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(resultTransition.value, [0, 0.8, 1], [0, 0, 1]),
+  }));
+
+  const animatedBottomSheetStyle = useAnimatedStyle(() => ({
+    transform: [{
+      translateY: interpolate(resultTransition.value, [0, 1], [SCREEN_HEIGHT * 0.6, 0])
+    }],
+  }));
 
   const totalCalories = meals.reduce((sum, m) => sum + m.calories, 0);
 
-  const handleAddFood = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+  const handleDateSelect = (day: any) => {
+    setSelectedDate(day.dateString);
+    setCalendarModalVisible(false);
+    
+    const today = new Date();
+    const offset = today.getTimezoneOffset() * 60000;
+    const todayStr = new Date(today.getTime() - offset).toISOString().split('T')[0];
+    
+    if (day.dateString === todayStr) {
+      setMeals(DIARY_MEALS);
+    } else {
+      let hash = 0;
+      for (let i = 0; i < day.dateString.length; i++) {
+        hash = day.dateString.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const randomMultiplier = Math.abs(hash % 10) / 10 + 0.5;
+      setMeals(DIARY_MEALS.map(m => ({
+        ...m,
+        calories: m.calories > 0 ? Math.floor(m.calories * randomMultiplier) : 0,
+        items: m.calories > 0 ? [`Mock item for ${day.dateString}`] : [],
+        empty: m.calories === 0,
+      })));
+    }
+  };
 
-      if (permissionResult.granted === false) {
-        Alert.alert("Permission required", "Camera permission is required to add food via photos!");
+  const handleAddFood = async () => {
+    if (!cameraPermission?.granted) {
+      const permissionResult = await requestCameraPermission();
+      if (!permissionResult.granted) {
+        Alert.alert("Permission required", "Camera permission is required to scan food.");
         return;
       }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 1,
-      });
-
-      if (!result.canceled) {
-        Alert.alert("Success", "Photo captured successfully! AI is analyzing your food...");
-        setTimeout(() => {
-          setPendingFood({
-            name: 'AI Identified Food',
-            calories: Math.floor(Math.random() * 300) + 100
-          });
-          setMealSelectorVisible(true);
-        }, 1500);
-      }
-    } catch (error) {
-      Alert.alert("Error", "Could not open camera. Ensure you are on a physical device and the app was restarted after installing the camera module.");
-      console.log(error);
     }
+    setScannerStep('camera');
+    setScannedResult(null);
+    setSelectedMealType(null);
+    setIsScanning(true);
   };
 
   return (
@@ -146,21 +266,29 @@ export default function DiaryScreen() {
         {/* Header Top Row */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <View style={styles.headerTopRow}>
-            <View style={styles.datePill}>
+            <TouchableOpacity 
+              activeOpacity={0.7} 
+              style={styles.datePill}
+              onPress={() => setCalendarModalVisible(true)}
+            >
               <View style={styles.dateIconContainer}>
                 <Ionicons name="calendar-outline" size={18} color="#333" />
               </View>
               <View>
-                <Text style={styles.dateDay}>Monday</Text>
-                <Text style={styles.dateFull}>Nov 24, 2025</Text>
+                <Text style={styles.dateDay}>{getFormattedDate(selectedDate).dayName}</Text>
+                <Text style={styles.dateFull}>{getFormattedDate(selectedDate).fullDate}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity 
               activeOpacity={0.7}
-              onPress={() => router.replace('/(auth)/login')}
+              onPress={() => router.push('/profile')}
             >
-              <View style={styles.avatarContainer}>
-                <Image source={{ uri: 'https://cdn3d.iconscout.com/3d/premium/thumb/woman-avatar-5822527-4898516.png' }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+              <View style={[styles.avatarContainer, !profileImage && { backgroundColor: '#F0FAE4' }]}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+                ) : (
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#7EB93C' }}>AG</Text>
+                )}
               </View>
             </TouchableOpacity>
           </View>
@@ -250,37 +378,42 @@ export default function DiaryScreen() {
           <View style={styles.chartHeader}>
             <Text style={styles.chartTitle}>Calorie Trends</Text>
             <View style={styles.chartTabs}>
-              <TouchableOpacity style={[styles.chartTab, styles.chartTabActive]}>
-                <Text style={[styles.chartTabText, styles.chartTabTextActive]}>Day</Text>
+              <TouchableOpacity 
+                style={[styles.chartTab, activeTrendTab === 'day' && styles.chartTabActive]}
+                onPress={() => setActiveTrendTab('day')}
+              >
+                <Text style={[styles.chartTabText, activeTrendTab === 'day' && styles.chartTabTextActive]}>Day</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.chartTab}>
-                <Text style={styles.chartTabText}>Week</Text>
+              <TouchableOpacity 
+                style={[styles.chartTab, activeTrendTab === 'week' && styles.chartTabActive]}
+                onPress={() => setActiveTrendTab('week')}
+              >
+                <Text style={[styles.chartTabText, activeTrendTab === 'week' && styles.chartTabTextActive]}>Week</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.chartTab}>
-                <Text style={styles.chartTabText}>Month</Text>
+              <TouchableOpacity 
+                style={[styles.chartTab, activeTrendTab === 'month' && styles.chartTabActive]}
+                onPress={() => setActiveTrendTab('month')}
+              >
+                <Text style={[styles.chartTabText, activeTrendTab === 'month' && styles.chartTabTextActive]}>Month</Text>
               </TouchableOpacity>
             </View>
           </View>
           
           <View style={styles.chartBody}>
             <View style={styles.yAxis}>
-              <Text style={styles.yAxisText}>3000</Text>
-              <Text style={styles.yAxisText}>2500</Text>
-              <Text style={styles.yAxisText}>2000</Text>
-              <Text style={styles.yAxisText}>1500</Text>
-              <Text style={styles.yAxisText}>1000</Text>
-              <Text style={styles.yAxisText}>500</Text>
-              <Text style={styles.yAxisText}>0</Text>
+              {Array.from({ length: 7 }, (_, i) => Math.round(TRENDS_DATA[activeTrendTab].max - (TRENDS_DATA[activeTrendTab].max / 6) * i)).map((val, idx) => (
+                <Text key={idx} style={styles.yAxisText}>{val}</Text>
+              ))}
             </View>
             
             <View style={styles.barsContainer}>
-              {TRENDS_DATA.map((item, index) => (
-                <View key={item.day} style={styles.barCol}>
+              {TRENDS_DATA[activeTrendTab].data.map((item) => (
+                <View key={item.label} style={styles.barCol}>
                   <View style={styles.barWrapper}>
                     <View style={styles.barTrack} />
-                    <View style={[styles.barFill, { height: `${(item.value / MAX_TREND) * 100}%` }]} />
+                    <View style={[styles.barFill, { height: `${(item.value / TRENDS_DATA[activeTrendTab].max) * 100}%` }]} />
                   </View>
-                  <Text style={styles.xAxisText}>{item.day}</Text>
+                  <Text style={styles.xAxisText}>{item.label}</Text>
                 </View>
               ))}
             </View>
@@ -357,42 +490,209 @@ export default function DiaryScreen() {
         </View>
       </Modal>
 
-      {/* Meal Type Selector Modal */}
-      <Modal visible={isMealSelectorVisible} transparent animationType="fade">
+      {/* Removed Meal Type Selector Modal */}
+
+      {/* Calendar Modal */}
+      <Modal visible={isCalendarModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add to which meal?</Text>
-            {['breakfast', 'lunch', 'dinner', 'snack'].map((mealId) => {
-              const mealConfig = meals.find(m => m.id === mealId);
-              if (!mealConfig) return null;
-              return (
-                <TouchableOpacity 
-                  key={mealId} 
-                  style={[styles.mealSelectorBtn, { backgroundColor: mealConfig.color + '20' }]} 
-                  onPress={() => {
-                    setMeals(current => current.map(m => {
-                      if (m.id === mealId) {
-                        return {
-                          ...m,
-                          calories: m.calories + pendingFood.calories,
-                          items: [...m.items, pendingFood.name],
-                          empty: false
-                        };
-                      }
-                      return m;
-                    }));
-                    setMealSelectorVisible(false);
-                    setPendingFood(null);
-                  }}
-                >
-                  <Text style={[styles.mealSelectorBtnText, { color: mealConfig.color }]}>{mealConfig.label}</Text>
-                </TouchableOpacity>
-              )
-            })}
-            <TouchableOpacity style={[styles.modalCancelBtn, { marginTop: 12, width: '100%' }]} onPress={() => setMealSelectorVisible(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+          <View style={[styles.modalCard, { padding: 0, overflow: 'hidden' }]}>
+            <Calendar
+              current={selectedDate}
+              onDayPress={handleDateSelect}
+              markedDates={{
+                [selectedDate]: { selected: true, selectedColor: '#7EB93C' }
+              }}
+              theme={{
+                todayTextColor: '#7EB93C',
+                arrowColor: '#7EB93C',
+              }}
+            />
+            <TouchableOpacity style={[styles.modalCancelBtn, { margin: 16 }]} onPress={() => setCalendarModalVisible(false)}>
+              <Text style={styles.modalCancelText}>Close</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* Custom Camera Scanner Modal */}
+      <Modal visible={isScanning} animationType="slide" transparent={false}>
+        <View style={styles.cameraContainer}>
+          {scannerStep === 'camera' && (
+            <CameraView ref={cameraRef} style={styles.camera} facing="back">
+              <View style={styles.cameraOverlay}>
+                <View style={styles.scanFrame}>
+                  <View style={[styles.corner, styles.topLeft]} />
+                  <View style={[styles.corner, styles.topRight]} />
+                  <View style={[styles.corner, styles.bottomLeft]} />
+                  <View style={[styles.corner, styles.bottomRight]} />
+                </View>
+                <Text style={styles.scanText}>Align food in frame</Text>
+                
+                <View style={styles.cameraActions}>
+                  <TouchableOpacity style={styles.closeCameraBtn} onPress={() => setIsScanning(false)}>
+                    <Ionicons name="close" size={30} color="#FFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.captureBtn} onPress={async () => {
+                    if (cameraRef.current) {
+                      const photo = await cameraRef.current.takePictureAsync();
+                      if (photo?.uri) {
+                        const dynamicResult = {
+                          ...MOCK_SCANNED_RESULT,
+                          image: photo.uri
+                        };
+                        setScannedResult(dynamicResult);
+                        setScannerStep('processing');
+                        resultTransition.value = 0;
+                        
+                        setTimeout(() => {
+                          resultTransition.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) });
+                        }, 2500);
+                      }
+                    }
+                  }}>
+                    <View style={styles.captureBtnInner} />
+                  </TouchableOpacity>
+                  <View style={{ width: 44 }} />
+                </View>
+              </View>
+            </CameraView>
+          )}
+
+          {scannerStep === 'processing' && scannedResult && (
+            <View style={styles.resultContainer}>
+              <Animated.View style={[styles.resultImageWrapper, animatedImageWrapperStyle]}>
+                <Image source={{ uri: scannedResult.image }} style={styles.resultImage} />
+                
+                {/* Result header buttons fade in */}
+                <Animated.View style={[styles.resultTopBar, animatedDetailsOpacityStyle]}>
+                  <TouchableOpacity style={styles.iconBtnBack} onPress={() => { setScannerStep('camera'); setScannedResult(null); }}>
+                    <Ionicons name="chevron-back" size={24} color="#FFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.iconBtnEdit}>
+                    <Ionicons name="pencil" size={20} color="#FFF" />
+                  </TouchableOpacity>
+                </Animated.View>
+
+                {/* Meal type overlay fades in */}
+                <Animated.View style={[styles.mealTypeOverlay, animatedDetailsOpacityStyle]}>
+                  <Text style={styles.mealTypeLabel}>Meal Type</Text>
+                  <Text style={styles.mealTypeValue}>{selectedMealType ? selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1) : 'Select below'}</Text>
+                </Animated.View>
+
+                {/* Scanning overlay fades out */}
+                <Animated.View style={[StyleSheet.absoluteFillObject, styles.cameraOverlay, animatedScanningOverlayStyle]}>
+                  <View style={styles.scanFrame}>
+                    <View style={[styles.corner, styles.topLeft]} />
+                    <View style={[styles.corner, styles.topRight]} />
+                    <View style={[styles.corner, styles.bottomLeft]} />
+                    <View style={[styles.corner, styles.bottomRight]} />
+                    <Animated.View style={[styles.scanLine, scanLineStyle]} />
+                  </View>
+                  <Text style={styles.scanText}>Analyzing image...</Text>
+                </Animated.View>
+              </Animated.View>
+
+              {/* Bottom Sheet sliding up */}
+              <Animated.View style={[styles.resultBottomSheetAbsolute, animatedBottomSheetStyle]}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.resultScrollContent}>
+                  <Text style={styles.resultTitle}>{scannedResult.title}</Text>
+                  <Text style={styles.resultSubtitle}>{scannedResult.subtitle}</Text>
+                  
+                  <View style={styles.servingRow}>
+                    <Text style={styles.servingText}><Text style={{fontWeight:'800'}}>{scannedResult.serving}</Text> Serving</Text>
+                    <Text style={styles.caloriesText}><Text style={{color:'#C93A3E'}}>{scannedResult.calories}</Text> Kcal</Text>
+                  </View>
+
+                  <View style={styles.resultMacrosRow}>
+                    <View style={styles.resultMacroCard}>
+                      <View style={styles.resultMacroIconBg}><Text style={{fontSize: 20}}>🍚</Text></View>
+                      <Text style={styles.resultMacroVal}>{scannedResult.macros.carbs}<Text style={styles.resultMacroUnit}>gr</Text></Text>
+                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Carbs</Text></View>
+                    </View>
+                    <View style={styles.resultMacroCard}>
+                      <View style={styles.resultMacroIconBg}><Text style={{fontSize: 20}}>🍗</Text></View>
+                      <Text style={styles.resultMacroVal}>{scannedResult.macros.protein}<Text style={styles.resultMacroUnit}>gr</Text></Text>
+                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Protein</Text></View>
+                    </View>
+                    <View style={styles.resultMacroCard}>
+                      <View style={styles.resultMacroIconBg}><Text style={{fontSize: 20}}>💧</Text></View>
+                      <Text style={styles.resultMacroVal}>{scannedResult.macros.fat}<Text style={styles.resultMacroUnit}>gr</Text></Text>
+                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Fat</Text></View>
+                    </View>
+                  </View>
+
+                  <Text style={styles.ingredientsTitle}>Ingredients</Text>
+                  <View style={styles.ingredientsList}>
+                    {scannedResult.ingredients.map((ing: any, idx: number) => (
+                      <View key={idx} style={styles.ingredientRow}>
+                        <View style={styles.ingredientTop}>
+                          <Text style={styles.ingredientName}>{ing.name}</Text>
+                          <Text style={styles.ingredientWeight}>{ing.weight}</Text>
+                        </View>
+                        <View style={styles.ingredientBottom}>
+                          <Text style={styles.ingredientCals}>{ing.calories} <Text style={{color: '#888'}}>Kcal</Text></Text>
+                          <View style={styles.ingredientMacros}>
+                            <View style={styles.ingMacroBadge}><Text style={styles.ingMacroText}>🍚 {ing.carbs}gr</Text></View>
+                            <View style={styles.ingMacroBadge}><Text style={styles.ingMacroText}>🍗 {ing.protein}gr</Text></View>
+                            <View style={styles.ingMacroBadge}><Text style={styles.ingMacroText}>💧 {ing.fat}gr</Text></View>
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                <View style={styles.resultAddBtnContainer}>
+                  <View style={styles.mealTypeChips}>
+                    {['breakfast', 'lunch', 'dinner', 'snack'].map(type => (
+                      <TouchableOpacity 
+                        key={type} 
+                        style={[
+                          styles.mealTypeChip, 
+                          selectedMealType === type && styles.mealTypeChipSelected
+                        ]}
+                        onPress={() => setSelectedMealType(type)}
+                      >
+                        <Text style={[
+                          styles.mealTypeChipText,
+                          selectedMealType === type && styles.mealTypeChipTextSelected
+                        ]}>
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TouchableOpacity 
+                    style={[styles.resultAddBtn, !selectedMealType && { opacity: 0.5 }]} 
+                    disabled={!selectedMealType}
+                    onPress={() => {
+                      if (selectedMealType) {
+                        setMeals(current => current.map(m => {
+                          if (m.id === selectedMealType) {
+                            return {
+                              ...m,
+                              calories: m.calories + scannedResult.calories,
+                              items: [...m.items, scannedResult.title],
+                              empty: false
+                            };
+                          }
+                          return m;
+                        }));
+                        setIsScanning(false);
+                        setTimeout(() => {
+                          setScannedResult(null);
+                          setSelectedMealType(null);
+                          setScannerStep('camera');
+                        }, 300);
+                      }
+                    }}
+                  >
+                    <Text style={styles.resultAddBtnText}>Add to Diary</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            </View>
+          )}
         </View>
       </Modal>
 
@@ -904,5 +1204,365 @@ const styles = StyleSheet.create({
   mealSelectorBtnText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  cameraContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    backgroundColor: 'transparent',
+    position: 'relative',
+    marginBottom: 40,
+  },
+  corner: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderColor: '#FFF',
+  },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 20,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 20,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 20,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 20,
+  },
+  scanLine: {
+    position: 'absolute',
+    top: 0,
+    left: 10,
+    right: 10,
+    height: 2,
+    backgroundColor: '#7EB93C',
+    shadowColor: '#7EB93C',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  scanText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 60,
+  },
+  cameraActions: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  closeCameraBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureBtn: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureBtnInner: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFF',
+  },
+  resultContainer: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+  },
+  resultImageWrapper: {
+    width: '100%',
+    position: 'relative',
+  },
+  resultImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  resultTopBar: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  iconBtnBack: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconBtnEdit: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mealTypeOverlay: {
+    position: 'absolute',
+    bottom: 50,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  mealTypeLabel: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+    opacity: 0.8,
+  },
+  mealTypeValue: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  resultBottomSheetAbsolute: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    zIndex: 20,
+  },
+  resultScrollContent: {
+    paddingBottom: 160,
+  },
+  resultTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  resultSubtitle: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 20,
+  },
+  servingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderColor: '#F0F0F0',
+    marginBottom: 20,
+  },
+  servingText: {
+    fontSize: 14,
+    color: '#555',
+  },
+  caloriesText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A1A1A',
+  },
+  resultMacrosRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  resultMacroCard: {
+    width: '31%',
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  resultMacroIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F9F9F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  resultMacroVal: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    marginBottom: 6,
+  },
+  resultMacroUnit: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '500',
+  },
+  resultMacroPill: {
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  resultMacroPillText: {
+    fontSize: 10,
+    color: '#555',
+    fontWeight: '600',
+  },
+  ingredientsTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    marginBottom: 16,
+  },
+  ingredientsList: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    padding: 16,
+    gap: 20,
+  },
+  ingredientRow: {
+    flexDirection: 'column',
+  },
+  ingredientTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  ingredientName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+  },
+  ingredientWeight: {
+    fontSize: 13,
+    color: '#999',
+  },
+  ingredientBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  ingredientCals: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#C93A3E',
+  },
+  ingredientMacros: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  ingMacroBadge: {
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    borderRadius: 10,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+  ingMacroText: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '600',
+  },
+  resultAddBtnContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    backgroundColor: '#FFF',
+    borderTopWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  resultAddBtn: {
+    backgroundColor: '#7EB93C',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  resultAddBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  mealTypeChips: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  mealTypeChip: {
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  mealTypeChipSelected: {
+    backgroundColor: '#7EB93C',
+  },
+  mealTypeChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666',
+  },
+  mealTypeChipTextSelected: {
+    color: '#FFF',
   },
 });
