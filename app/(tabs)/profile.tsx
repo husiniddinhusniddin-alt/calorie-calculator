@@ -16,14 +16,47 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { MockStore } from '@/constants/store';
 
+const translations = {
+  en: {
+    myProfile: 'My Profile', weight: 'Weight', height: 'Height', age: 'Age', activeTargetGoal: 'ACTIVE TARGET GOAL', target: 'Target',
+    weightMaintenance: 'Weight Maintenance', goalPrefix: 'Goal:', loseWeight: 'Lose weight', gainWeight: 'Gain weight',
+    currentStreaks: 'Current Streaks', calorieTarget: 'Calorie Target', waterIntake: 'Water Intake', weightLoss: 'Weight Loss',
+    personalDetails: 'Personal Details', notificationSettings: 'Notification Settings', privacySecurity: 'Privacy & Security', appPreferences: 'App Preferences',
+    logOut: 'Log Out', premiumMember: 'Premium Member', days: 'Days'
+  },
+  ru: {
+    myProfile: 'Мой профиль', weight: 'Вес', height: 'Рост', age: 'Возраст', activeTargetGoal: 'АКТИВНАЯ ЦЕЛЬ', target: 'Цель',
+    weightMaintenance: 'Поддержание веса', goalPrefix: 'Цель:', loseWeight: 'Сбросить вес', gainWeight: 'Набрать вес',
+    currentStreaks: 'Текущие серии', calorieTarget: 'Цель по калориям', waterIntake: 'Потребление воды', weightLoss: 'Потеря веса',
+    personalDetails: 'Личные данные', notificationSettings: 'Настройки уведомлений', privacySecurity: 'Конфиденциальность', appPreferences: 'Настройки',
+    logOut: 'Выйти', premiumMember: 'Премиум', days: 'Дней'
+  },
+  uz: {
+    myProfile: 'Mening profilim', weight: 'Vazn', height: 'Bo\'yi', age: 'Yosh', activeTargetGoal: 'FAOL MAQSAD', target: 'Maqsad',
+    weightMaintenance: 'Vaznni saqlash', goalPrefix: 'Maqsad:', loseWeight: 'yo\'qotish', gainWeight: 'oshirish',
+    currentStreaks: 'Hozirgi seriyalar', calorieTarget: 'Kaloriya maqsadi', waterIntake: 'Suv ichish', weightLoss: 'Vazn yo\'qotish',
+    personalDetails: 'Shaxsiy ma\'lumotlar', notificationSettings: 'Bildirishnomalar', privacySecurity: 'Maxfiylik', appPreferences: 'Ilova sozlamalari',
+    logOut: 'Chiqish', premiumMember: 'Premium A\'zo', days: 'Kun'
+  }
+};
+
+import { supabase } from '@/constants/supabase';
+
 export default function ProfileScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  
+  const [appTheme, setAppTheme] = useState(MockStore.appTheme);
+  const [language, setLanguage] = useState(MockStore.language);
+  const [name, setName] = useState<string>(MockStore.name);
+  const [email, setEmail] = useState<string>(MockStore.email);
+  const t = translations[language];
+
+  const systemColorScheme = useColorScheme();
+  const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
 
   // Theme Colors
   const theme = {
-    background: isDark ? '#0F140A' : '#FFFFFF',
+    background: isDark ? '#0F140A' : '#F7FAF3',
     cardBackground: isDark ? '#171E10' : '#FFFFFF',
     cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
     textPrimary: isDark ? '#FAFCF8' : '#1A2310',
@@ -35,7 +68,6 @@ export default function ProfileScreen() {
     menuIconBg: isDark ? '#23321A' : '#F0FAE4',
   };
 
-  // State synced with MockStore
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
   const [targetWeight, setTargetWeight] = useState<number>(MockStore.targetWeight);
   const [currentWeight, setCurrentWeight] = useState<number>(MockStore.currentWeight);
@@ -46,11 +78,32 @@ export default function ProfileScreen() {
       setProfileImage(MockStore.profileImage);
       setTargetWeight(MockStore.targetWeight);
       setCurrentWeight(MockStore.currentWeight);
+      setAppTheme(MockStore.appTheme);
+      setLanguage(MockStore.language);
+      setName(MockStore.name);
+      setEmail(MockStore.email);
     });
   }, []);
 
-  const handleLogout = () => {
-    router.replace('/(auth)/login');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      // Reset MockStore values
+      MockStore.update({
+        profileImage: null,
+        targetWeight: 82,
+        currentWeight: 85,
+        startingWeight: 88,
+        dailyCalorieGoal: 1900,
+        weeklyWeightGoal: 0.5,
+        name: 'Alex Green',
+        email: 'alex.green@health.com',
+      });
+      router.replace('/(auth)/login');
+    } catch (err) {
+      console.warn('Sign out error:', err);
+      router.replace('/(auth)/login');
+    }
   };
 
   // Profile Image Picker
@@ -71,6 +124,18 @@ export default function ProfileScreen() {
     if (!result.canceled && result.assets && result.assets[0].uri) {
       const selectedUri = result.assets[0].uri;
       MockStore.update({ profileImage: selectedUri });
+      
+      // Update image url in Supabase profiles table
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('profiles').update({
+            profile_image: selectedUri,
+          }).eq('id', user.id);
+        }
+      } catch (err) {
+        console.warn('Failed to update avatar in DB:', err);
+      }
     }
   };
 
@@ -86,7 +151,7 @@ export default function ProfileScreen() {
         
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-          <Text style={[styles.pageTitle, { color: theme.textBrand }]}>My Profile</Text>
+          <Text style={[styles.pageTitle, { color: theme.textBrand }]}>{t.myProfile}</Text>
           <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]} activeOpacity={0.7}>
             <Ionicons name="notifications-outline" size={24} color="#7EB93C" />
             <View style={styles.badge} />
@@ -116,11 +181,11 @@ export default function ProfileScreen() {
             </TouchableOpacity>
 
             <View style={styles.profileDetails}>
-              <Text style={[styles.profileName, { color: theme.textPrimary }]}>Alex Green</Text>
-              <Text style={[styles.profileEmail, { color: theme.textMuted }]}>alex.green@health.com</Text>
+              <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>
+              <Text style={[styles.profileEmail, { color: theme.textMuted }]}>{email}</Text>
               <View style={[styles.tierBadge, { backgroundColor: theme.badgeBackground }]}>
                 <Ionicons name="shield-checkmark" size={12} color="#7EB93C" />
-                <Text style={styles.tierText}>Premium Member</Text>
+                <Text style={styles.tierText}>{t.premiumMember}</Text>
               </View>
             </View>
           </View>
@@ -130,17 +195,17 @@ export default function ProfileScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
               <Text style={[styles.statVal, { color: theme.textPrimary }]}>{currentWeight} kg</Text>
-              <Text style={[styles.statLbl, { color: theme.textMuted }]}>Weight</Text>
+              <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.weight}</Text>
             </View>
             <View style={[styles.statDividerVertical, { backgroundColor: theme.cardBorder }]} />
             <View style={styles.statBox}>
               <Text style={[styles.statVal, { color: theme.textPrimary }]}>182 cm</Text>
-              <Text style={[styles.statLbl, { color: theme.textMuted }]}>Height</Text>
+              <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.height}</Text>
             </View>
             <View style={[styles.statDividerVertical, { backgroundColor: theme.cardBorder }]} />
             <View style={styles.statBox}>
-              <Text style={[styles.statVal, { color: theme.textPrimary }]}>28 yo</Text>
-              <Text style={[styles.statLbl, { color: theme.textMuted }]}>Age</Text>
+              <Text style={[styles.statVal, { color: theme.textPrimary }]}>28</Text>
+              <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.age}</Text>
             </View>
           </View>
         </Animated.View>
@@ -159,14 +224,14 @@ export default function ProfileScreen() {
               <Ionicons name="flag" size={22} color="#7EB93C" />
             </View>
             <View style={styles.goalInfo}>
-              <Text style={[styles.goalHeaderTitle, { color: theme.textMuted }]}>ACTIVE TARGET GOAL</Text>
+              <Text style={[styles.goalHeaderTitle, { color: theme.textMuted }]}>{t.activeTargetGoal}</Text>
               <Text style={[styles.goalWeightInfo, { color: theme.textPrimary }]}>
-                Target: {targetWeight} kg
+                {t.target}: {targetWeight} kg
               </Text>
               <Text style={styles.goalDifferenceText}>
                 {absWeightDiff === 0 
-                  ? "Weight Maintenance" 
-                  : `Maqsad: ${absWeightDiff.toFixed(1)} kg ${isLoss ? "yo'qotish" : "oshirish"} (${isLoss ? "Lose" : "Gain"} weight)`
+                  ? t.weightMaintenance
+                  : `${t.goalPrefix} ${absWeightDiff.toFixed(1)} kg ${isLoss ? t.loseWeight : t.gainWeight}`
                 }
               </Text>
             </View>
@@ -174,27 +239,26 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Achievements Card */}
         <Animated.View 
           entering={FadeInDown.duration(500).delay(200)} 
           style={[styles.achievementsCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
-          <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>Current Streaks</Text>
+          <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.currentStreaks}</Text>
           <View style={styles.streaksContainer}>
             <View style={[styles.streakItem, { backgroundColor: theme.streakBoxBg, borderColor: theme.cardBorder }]}>
               <View style={[styles.streakIconBg, { backgroundColor: '#FFF7E6' }]}>
                 <Ionicons name="flame" size={24} color="#FFA940" />
               </View>
-              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>5 Days</Text>
-              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>Calorie Target</Text>
+              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>5 {t.days}</Text>
+              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.calorieTarget}</Text>
             </View>
 
             <View style={[styles.streakItem, { backgroundColor: theme.streakBoxBg, borderColor: theme.cardBorder }]}>
               <View style={[styles.streakIconBg, { backgroundColor: '#F0FAE4' }]}>
                 <Ionicons name="water" size={24} color="#7EB93C" />
               </View>
-              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>12 Days</Text>
-              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>Water Intake</Text>
+              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>12 {t.days}</Text>
+              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.waterIntake}</Text>
             </View>
 
             <View style={[styles.streakItem, { backgroundColor: theme.streakBoxBg, borderColor: theme.cardBorder }]}>
@@ -202,7 +266,7 @@ export default function ProfileScreen() {
                 <Ionicons name="trending-down" size={24} color="#1890FF" />
               </View>
               <Text style={[styles.streakCount, { color: theme.textPrimary }]}>-{absWeightDiff.toFixed(1)} kg</Text>
-              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>Weight Loss</Text>
+              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.weightLoss}</Text>
             </View>
           </View>
         </Animated.View>
@@ -220,7 +284,7 @@ export default function ProfileScreen() {
             <View style={[styles.menuIconBg, { backgroundColor: theme.menuIconBg }]}>
               <Ionicons name="person-outline" size={20} color="#7EB93C" />
             </View>
-            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>Personal Details</Text>
+            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>{t.personalDetails}</Text>
             <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
           </TouchableOpacity>
 
@@ -234,7 +298,7 @@ export default function ProfileScreen() {
             <View style={[styles.menuIconBg, { backgroundColor: theme.menuIconBg }]}>
               <Ionicons name="notifications-outline" size={20} color="#7EB93C" />
             </View>
-            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>Notification Settings</Text>
+            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>{t.notificationSettings}</Text>
             <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
           </TouchableOpacity>
 
@@ -248,7 +312,7 @@ export default function ProfileScreen() {
             <View style={[styles.menuIconBg, { backgroundColor: theme.menuIconBg }]}>
               <Ionicons name="shield-outline" size={20} color="#7EB93C" />
             </View>
-            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>Privacy & Security</Text>
+            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>{t.privacySecurity}</Text>
             <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
           </TouchableOpacity>
 
@@ -262,7 +326,7 @@ export default function ProfileScreen() {
             <View style={[styles.menuIconBg, { backgroundColor: theme.menuIconBg }]}>
               <Ionicons name="settings-outline" size={20} color="#7EB93C" />
             </View>
-            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>App Preferences</Text>
+            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>{t.appPreferences}</Text>
             <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
           </TouchableOpacity>
         </Animated.View>
@@ -275,7 +339,7 @@ export default function ProfileScreen() {
             onPress={handleLogout}
           >
             <Ionicons name="log-out-outline" size={20} color="#FF4D4F" style={{ marginRight: 8 }} />
-            <Text style={styles.logoutBtnText}>Log Out</Text>
+            <Text style={styles.logoutBtnText}>{t.logOut}</Text>
           </TouchableOpacity>
         </Animated.View>
 

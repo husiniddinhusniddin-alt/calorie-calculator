@@ -17,6 +17,7 @@ import { Provider as PaperProvider, TextInput, Snackbar, Portal } from 'react-na
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
 
 export default function ProfileDetailsScreen() {
   const router = useRouter();
@@ -38,39 +39,81 @@ export default function ProfileDetailsScreen() {
     inputOutline: isDark ? '#2A3A1E' : '#EBF2E5',
   };
 
-  // Sync state with MockStore
-  const [name, setName] = useState('Alex Green');
-  const [email, setEmail] = useState('alex.green@health.com');
-  const [phone, setPhone] = useState('+1 (555) 019-2834');
-  const [height, setHeight] = useState(MockStore.currentWeight.toString()); // mock mapping
+  // Sync state with MockStore (already populated from Supabase on login)
+  const [name, setName] = useState(MockStore.name || 'User');
+  const [email, setEmail] = useState(MockStore.email || '');
+  const [phone, setPhone] = useState('');
+  const [height, setHeight] = useState('180');
   const [weight, setWeight] = useState(MockStore.currentWeight.toString());
-  const [dob, setDob] = useState('1998-05-12');
+  const [dob, setDob] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
 
-  // Subscribe to MockStore updates
+  // On mount, fetch full profile from Supabase to get phone, height, dob
   useEffect(() => {
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (profile) {
+        setName(profile.name || MockStore.name);
+        setEmail(profile.email || MockStore.email);
+        setPhone(profile.phone || '');
+        setHeight((profile.height || 180).toString());
+        setWeight((profile.current_weight || MockStore.currentWeight).toString());
+        setDob(profile.dob || '');
+        setProfileImage(profile.profile_image || MockStore.profileImage);
+      }
+    }
+    loadProfile();
+
     return MockStore.subscribe(() => {
       setProfileImage(MockStore.profileImage);
       setWeight(MockStore.currentWeight.toString());
     });
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim() || !email.trim()) {
       setSnackbarMsg('Name and Email cannot be empty.');
       setSnackbarVisible(true);
       return;
     }
-    
-    // Save to MockStore
+
     const parsedWeight = parseFloat(weight) || MockStore.currentWeight;
+    const parsedHeight = parseFloat(height) || 180;
+
+    // Save to MockStore
     MockStore.update({
+      name: name.trim(),
+      email: email.trim(),
       profileImage: profileImage,
       currentWeight: parsedWeight,
     });
+
+    // Save to Supabase profiles table
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          height: parsedHeight,
+          current_weight: parsedWeight,
+          dob: dob.trim() || null,
+          profile_image: profileImage,
+        }).eq('id', user.id);
+      }
+    } catch (err) {
+      console.warn('Failed to save profile to DB:', err);
+    }
 
     setSnackbarMsg('Personal details saved successfully! 🎉');
     setSnackbarVisible(true);

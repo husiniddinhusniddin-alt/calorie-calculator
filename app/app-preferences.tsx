@@ -11,17 +11,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, Snackbar, Portal } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
+import { useColorScheme } from 'react-native';
+import { MockStore } from '@/constants/store';
 
 export default function AppPreferencesScreen() {
   const router = useRouter();
   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
   const [heightUnit, setHeightUnit] = useState<'cm' | 'inches'>('cm');
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal');
-  const [appTheme, setAppTheme] = useState<'light' | 'dark' | 'system'>('light');
+  const [appTheme, setAppTheme] = useState<'light' | 'dark' | 'system'>(MockStore.appTheme);
+  const [language, setLanguage] = useState<'en' | 'ru' | 'uz'>(MockStore.language);
+
+  const systemColorScheme = useColorScheme();
+  const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
+
+  const theme = {
+    background: isDark ? '#0F140A' : '#F7FAF3',
+    cardBackground: isDark ? '#171E10' : '#FFFFFF',
+    cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A2310',
+    textSecondary: isDark ? '#9AA88E' : '#3A5C18',
+    segmentBg: isDark ? '#171E10' : '#FAFCF8',
+    segmentText: isDark ? '#9AA88E' : '#6B785E',
+  };
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
 
   const handleSave = () => {
+    MockStore.update({ appTheme, language });
     setSnackbarVisible(true);
     setTimeout(() => {
       router.back();
@@ -30,107 +47,134 @@ export default function AppPreferencesScreen() {
 
   return (
     <PaperProvider>
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.cardBorder }]}>
           <TouchableOpacity 
-            style={styles.backBtn}
+            style={[styles.backBtn, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}
             onPress={() => router.back()}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color="#3A5C18" />
+            <Ionicons name="arrow-back" size={24} color={theme.textSecondary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>App Preferences</Text>
+          <Text style={[styles.headerTitle, { color: theme.textSecondary }]}>App Preferences</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Units Card */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Measurement Units</Text>
+          <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Measurement Units</Text>
 
             {/* Weight Unit */}
             <View style={styles.preferenceRow}>
-              <Text style={styles.prefLabel}>Weight Unit</Text>
-              <View style={styles.segmentedControl}>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Weight Unit</Text>
+              <View style={[styles.segmentedControl, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}>
                 <TouchableOpacity
                   style={[styles.segmentBtn, weightUnit === 'kg' && styles.segmentBtnActive]}
                   onPress={() => setWeightUnit('kg')}
                 >
-                  <Text style={[styles.segmentText, weightUnit === 'kg' && styles.segmentTextActive]}>kg</Text>
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, weightUnit === 'kg' && styles.segmentTextActive]}>kg</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segmentBtn, weightUnit === 'lbs' && styles.segmentBtnActive]}
                   onPress={() => setWeightUnit('lbs')}
                 >
-                  <Text style={[styles.segmentText, weightUnit === 'lbs' && styles.segmentTextActive]}>lbs</Text>
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, weightUnit === 'lbs' && styles.segmentTextActive]}>lbs</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.cardBorder }]} />
 
             {/* Height Unit */}
             <View style={styles.preferenceRow}>
-              <Text style={styles.prefLabel}>Height Unit</Text>
-              <View style={styles.segmentedControl}>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Height Unit</Text>
+              <View style={[styles.segmentedControl, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}>
                 <TouchableOpacity
                   style={[styles.segmentBtn, heightUnit === 'cm' && styles.segmentBtnActive]}
                   onPress={() => setHeightUnit('cm')}
                 >
-                  <Text style={[styles.segmentText, heightUnit === 'cm' && styles.segmentTextActive]}>cm</Text>
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, heightUnit === 'cm' && styles.segmentTextActive]}>cm</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segmentBtn, heightUnit === 'inches' && styles.segmentBtnActive]}
                   onPress={() => setHeightUnit('inches')}
                 >
-                  <Text style={[styles.segmentText, heightUnit === 'inches' && styles.segmentTextActive]}>in</Text>
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, heightUnit === 'inches' && styles.segmentTextActive]}>in</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.cardBorder }]} />
 
             {/* Energy Unit */}
             <View style={styles.preferenceRow}>
-              <Text style={styles.prefLabel}>Energy Unit</Text>
-              <View style={styles.segmentedControl}>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Energy Unit</Text>
+              <View style={[styles.segmentedControl, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}>
                 <TouchableOpacity
                   style={[styles.segmentBtn, energyUnit === 'kcal' && styles.segmentBtnActive]}
                   onPress={() => setEnergyUnit('kcal')}
                 >
-                  <Text style={[styles.segmentText, energyUnit === 'kcal' && styles.segmentTextActive]}>kcal</Text>
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, energyUnit === 'kcal' && styles.segmentTextActive]}>kcal</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segmentBtn, energyUnit === 'kJ' && styles.segmentBtnActive]}
                   onPress={() => setEnergyUnit('kJ')}
                 >
-                  <Text style={[styles.segmentText, energyUnit === 'kJ' && styles.segmentTextActive]}>kJ</Text>
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, energyUnit === 'kJ' && styles.segmentTextActive]}>kJ</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={[styles.divider, { backgroundColor: theme.cardBorder }]} />
+
+            {/* Language */}
+            <View style={styles.preferenceRow}>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Language</Text>
+              <View style={[styles.segmentedControl, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, language === 'uz' && styles.segmentBtnActive]}
+                  onPress={() => setLanguage('uz')}
+                >
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, language === 'uz' && styles.segmentTextActive]}>UZ</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, language === 'en' && styles.segmentBtnActive]}
+                  onPress={() => setLanguage('en')}
+                >
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, language === 'en' && styles.segmentTextActive]}>EN</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, language === 'ru' && styles.segmentBtnActive]}
+                  onPress={() => setLanguage('ru')}
+                >
+                  <Text style={[styles.segmentText, { color: theme.segmentText }, language === 'ru' && styles.segmentTextActive]}>RU</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
 
           {/* Theme Card */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>App Theme</Text>
+          <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>App Theme</Text>
             <View style={styles.themeOptions}>
               {(['light', 'dark', 'system'] as const).map((t) => {
                 const isActive = appTheme === t;
                 return (
                   <TouchableOpacity
                     key={t}
-                    style={[styles.themeBtn, isActive && styles.themeBtnActive]}
+                    style={[styles.themeBtn, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }, isActive && styles.themeBtnActive]}
                     onPress={() => setAppTheme(t)}
                     activeOpacity={0.8}
                   >
                     <Ionicons 
                       name={t === 'light' ? 'sunny-outline' : t === 'dark' ? 'moon-outline' : 'settings-outline'} 
                       size={20} 
-                      color={isActive ? '#FFFFFF' : '#6B785E'} 
+                      color={isActive ? '#FFFFFF' : theme.segmentText} 
                     />
-                    <Text style={[styles.themeBtnText, isActive && styles.themeBtnTextActive]}>
+                    <Text style={[styles.themeBtnText, { color: theme.segmentText }, isActive && styles.themeBtnTextActive]}>
                       {t.charAt(0).toUpperCase() + t.slice(1)}
                     </Text>
                   </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,12 +10,103 @@ import {
   Dimensions,
   SafeAreaView,
   Alert,
+  useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInUp, SlideInRight } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
+import { MockStore } from '@/constants/store';
 
 const { width, height } = Dimensions.get('window');
+
+const translations = {
+  en: {
+    searchFood: 'Search Food',
+    searchDishes: 'Search dishes...',
+    pasta: 'Pasta',
+    chicken: 'Chicken',
+    vegetables: 'Vegetables',
+    seafood: 'Seafood',
+    addedToDiary: 'Added to Diary',
+    addedMsg: '{name} ({weight}g) has been added.',
+    ok: 'OK',
+    done: 'Done',
+    portionWeightText: 'Your portion in grams',
+    kcal: 'kcal',
+    carbohydrates: 'Carbohydrates',
+    proteins: 'Proteins',
+    fats: 'Fats',
+    fatsShort: 'Fats',
+    carbsShort: 'Carbs',
+    protShort: 'Prot',
+    
+    // Dish names
+    carbonaraName: 'Carbonara',
+    milanoName: 'Milano',
+    pestoPastaName: 'Pesto Pasta',
+    
+    // Dish descriptions
+    carbonaraDesc: 'This cheesy pasta dish',
+    milanoDesc: 'Classic Milanese tomato pasta',
+    pestoPastaDesc: 'Fresh basil pesto spaghetti',
+  },
+  ru: {
+    searchFood: 'Поиск еды',
+    searchDishes: 'Поиск блюд...',
+    pasta: 'Паста',
+    chicken: 'Курица',
+    vegetables: 'Овощи',
+    seafood: 'Морепродукты',
+    addedToDiary: 'Добавлено в дневник',
+    addedMsg: '{name} ({weight}г) было добавлено.',
+    ok: 'OK',
+    done: 'Готово',
+    portionWeightText: 'Ваша порция в граммах',
+    kcal: 'ктал',
+    carbohydrates: 'Углеводы',
+    proteins: 'Белки',
+    fats: 'Жиры',
+    fatsShort: 'Жиры',
+    carbsShort: 'Угл',
+    protShort: 'Бел',
+    
+    carbonaraName: 'Карбонара',
+    milanoName: 'Милано',
+    pestoPastaName: 'Паста с песто',
+    
+    carbonaraDesc: 'Это сырное блюдо из пасты',
+    milanoDesc: 'Классическая миланская томатная паста',
+    pestoPastaDesc: 'Спагетти со свежим базиликовым песто',
+  },
+  uz: {
+    searchFood: 'Taom qidirish',
+    searchDishes: 'Taomlarni qidirish...',
+    pasta: 'Pasta',
+    chicken: 'Tovuq',
+    vegetables: 'Sabzavotlar',
+    seafood: 'Dengiz mahsulotlari',
+    addedToDiary: 'Kundalikka qo\'shildi',
+    addedMsg: '{name} ({weight}g) qo\'shildi.',
+    ok: 'OK',
+    done: 'Tayyor',
+    portionWeightText: 'Sizning porsiyangiz grammda',
+    kcal: 'kkal',
+    carbohydrates: 'Uglevodlar',
+    proteins: 'Oqsillar',
+    fats: 'Yog\'lar',
+    fatsShort: 'Yog\'',
+    carbsShort: 'Ugl',
+    protShort: 'Oqsil',
+    
+    carbonaraName: 'Karbonara',
+    milanoName: 'Milano',
+    pestoPastaName: 'Pesto Pastasi',
+    
+    carbonaraDesc: 'Bu pishloqli pasta taomi',
+    milanoDesc: 'Klassik Milan pomidorli pastasi',
+    pestoPastaDesc: 'Yangi rayhon pestoli spagetti',
+  }
+};
 
 const DISH_RESULTS = [
   {
@@ -54,51 +145,105 @@ const DISH_RESULTS = [
 ];
 
 export default function SearchScreen() {
+  const [appTheme, setAppTheme] = useState(MockStore.appTheme);
+  const [language, setLanguage] = useState(MockStore.language);
+  
+  useEffect(() => {
+    return MockStore.subscribe(() => {
+      setAppTheme(MockStore.appTheme);
+      setLanguage(MockStore.language);
+    });
+  }, []);
+
+  const systemColorScheme = useColorScheme();
+  const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
+  const t = translations[language] || translations.en;
+
+  const theme = {
+    background: isDark ? '#0F140A' : '#F7FAF3',
+    cardBackground: isDark ? '#171E10' : '#FFFFFF',
+    cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A2310',
+    textSecondary: isDark ? '#9AA88E' : '#555555',
+    textMuted: isDark ? '#6B785E' : '#888888',
+    pillBackground: isDark ? '#23321A' : '#FFFFFF',
+    inputText: isDark ? '#FAFCF8' : '#333333',
+    dialBg: isDark ? '#23321A' : '#F5FAF0',
+    dialTextActive: isDark ? '#FAFCF8' : '#1C2E0A',
+    doneBtnBg: isDark ? '#7EB93C' : '#1C2E0A',
+    doneBtnText: '#FFFFFF',
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('pasta');
-  const [selectedDish, setSelectedDish] = useState<typeof DISH_RESULTS[0] | null>(null);
+  const [selectedDish, setSelectedDish] = useState<any | null>(null);
   
   // Detail slider state (portion weight in grams)
   const [portionWeight, setPortionWeight] = useState(214);
   const weights = Array.from({ length: 11 }, (_, i) => 210 + i);
 
-  const filteredDishes = DISH_RESULTS.filter(dish => {
+  const localizedDishes = DISH_RESULTS.map(dish => {
+    let name = dish.name;
+    let description = dish.description;
+    const categoryKey = dish.category as keyof typeof t;
+    const category = t[categoryKey] || dish.category;
+    
+    if (dish.id === '1') {
+      name = t.carbonaraName;
+      description = t.carbonaraDesc;
+    } else if (dish.id === '2') {
+      name = t.milanoName;
+      description = t.milanoDesc;
+    } else if (dish.id === '3') {
+      name = t.pestoPastaName;
+      description = t.pestoPastaDesc;
+    }
+    
+    return {
+      ...dish,
+      name,
+      description,
+      category,
+    };
+  });
+
+  const filteredDishes = localizedDishes.filter(dish => {
     const matchesQuery = dish.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory ? dish.category === selectedCategory : true;
+    const matchesCategory = selectedCategory ? dish.category.toLowerCase() === (t[selectedCategory as keyof typeof t] || selectedCategory).toLowerCase() : true;
     return matchesQuery && matchesCategory;
   });
 
   const handleAddPortion = () => {
     if (selectedDish) {
       Alert.alert(
-        'Added to Diary',
-        `${selectedDish.name} (${portionWeight}g) has been added.`,
-        [{ text: 'OK', onPress: () => setSelectedDish(null) }]
+        t.addedToDiary,
+        t.addedMsg.replace('{name}', selectedDish.name).replace('{weight}', portionWeight.toString()),
+        [{ text: t.ok, onPress: () => setSelectedDish(null) }]
       );
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       
       {!selectedDish ? (
         // SEARCH LIST VIEW
         <View style={styles.mainView}>
-          <Text style={styles.headerTitle}>Search Food</Text>
+          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{t.searchFood}</Text>
           
           {/* Custom Search Box with voice mic */}
-          <View style={styles.searchBox}>
+          <View style={[styles.searchBox, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
             <Ionicons name="search" size={20} color="#7EB93C" style={styles.searchIcon} />
             <TextInput
-              style={styles.searchInput}
-              placeholder="Search dishes..."
-              placeholderTextColor="#999"
+              style={[styles.searchInput, { color: theme.inputText }]}
+              placeholder={t.searchDishes}
+              placeholderTextColor={theme.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             <TouchableOpacity style={styles.micButton}>
-              <Ionicons name="mic-outline" size={20} color="#666" />
+              <Ionicons name="mic-outline" size={20} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -110,14 +255,16 @@ export default function SearchScreen() {
                 onPress={() => setSelectedCategory(cat)}
                 style={[
                   styles.tag,
+                  { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder },
                   selectedCategory === cat && styles.tagActive
                 ]}
               >
                 <Text style={[
                   styles.tagText,
+                  { color: theme.textSecondary },
                   selectedCategory === cat && styles.tagTextActive
                 ]}>
-                  {cat}
+                  {t[cat as keyof typeof t] || cat}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -133,17 +280,17 @@ export default function SearchScreen() {
                 <TouchableOpacity
                   activeOpacity={0.9}
                   onPress={() => setSelectedDish(dish)}
-                  style={styles.dishCard}
+                  style={[styles.dishCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
                 >
                   <Image source={dish.image} style={styles.dishCardImage} />
                   <View style={styles.dishCardInfo}>
-                    <Text style={styles.dishCardCalories}>{dish.calories} kcal</Text>
-                    <Text style={styles.dishCardName}>{dish.name}</Text>
-                    <Text style={styles.dishCardMacros}>
-                      Fats {dish.fats} • Carbs {dish.carbs} • Prot {dish.protein}
+                    <Text style={styles.dishCardCalories}>{dish.calories} {t.kcal}</Text>
+                    <Text style={[styles.dishCardName, { color: theme.textPrimary }]}>{dish.name}</Text>
+                    <Text style={[styles.dishCardMacros, { color: theme.textMuted }]}>
+                      {t.fatsShort} {dish.fats} • {t.carbsShort} {dish.carbs} • {t.protShort} {dish.protein}
                     </Text>
                   </View>
-                  <View style={styles.arrowContainer}>
+                  <View style={[styles.arrowContainer, { backgroundColor: theme.pillBackground }]}>
                     <Ionicons name="chevron-forward" size={20} color="#7EB93C" />
                   </View>
                 </TouchableOpacity>
@@ -153,19 +300,19 @@ export default function SearchScreen() {
         </View>
       ) : (
         // DISH DETAIL VIEW (CARBONARA SCREEN)
-        <Animated.View entering={SlideInRight.duration(400)} style={styles.detailView}>
+        <Animated.View entering={SlideInRight.duration(400)} style={[styles.detailView, { backgroundColor: theme.cardBackground }]}>
           <TouchableOpacity 
             style={styles.backButton} 
             onPress={() => setSelectedDish(null)}
           >
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </TouchableOpacity>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScrollContent}>
             {/* Category / Name Header */}
             <Text style={styles.detailCategory}>{selectedDish.category.toUpperCase()}</Text>
-            <Text style={styles.detailTitle}>{selectedDish.name}</Text>
-            <Text style={styles.detailDesc}>{selectedDish.description}</Text>
+            <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>{selectedDish.name}</Text>
+            <Text style={[styles.detailDesc, { color: theme.textMuted }]}>{selectedDish.description}</Text>
 
             {/* Food Image and Macro Details Container */}
             <View style={styles.detailBody}>
@@ -175,33 +322,33 @@ export default function SearchScreen() {
 
               <View style={styles.detailMacros}>
                 <View style={styles.detailCalContainer}>
-                  <Text style={styles.detailCalLabel}>kcal</Text>
-                  <Text style={styles.detailCalValue}>{selectedDish.calories}</Text>
+                  <Text style={[styles.detailCalLabel, { color: theme.textMuted }]}>{t.kcal}</Text>
+                  <Text style={[styles.detailCalValue, { color: theme.textPrimary }]}>{selectedDish.calories}</Text>
                 </View>
 
                 {/* Macro Items */}
                 <View style={styles.macroRow}>
                   <View style={[styles.macroDot, { backgroundColor: '#7EB93C' }]} />
-                  <Text style={styles.macroLabel}>Carbohydrates</Text>
-                  <Text style={styles.macroVal}>{selectedDish.carbs}</Text>
+                  <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>{t.carbohydrates}</Text>
+                  <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{selectedDish.carbs}</Text>
                 </View>
                 <View style={styles.macroRow}>
                   <View style={[styles.macroDot, { backgroundColor: '#FAD02C' }]} />
-                  <Text style={styles.macroLabel}>Proteins</Text>
-                  <Text style={styles.macroVal}>{selectedDish.protein}</Text>
+                  <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>{t.proteins}</Text>
+                  <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{selectedDish.protein}</Text>
                 </View>
                 <View style={styles.macroRow}>
                   <View style={[styles.macroDot, { backgroundColor: '#FF8C42' }]} />
-                  <Text style={styles.macroLabel}>Fats</Text>
-                  <Text style={styles.macroVal}>{selectedDish.fats}</Text>
+                  <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>{t.fats}</Text>
+                  <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{selectedDish.fats}</Text>
                 </View>
               </View>
             </View>
 
             {/* Weight Dial Selector */}
             <View style={styles.weightSelectorContainer}>
-              <Text style={styles.weightLabel}>Your portion in grams</Text>
-              <View style={styles.dialWrapper}>
+              <Text style={[styles.weightLabel, { color: theme.textMuted }]}>{t.portionWeightText}</Text>
+              <View style={[styles.dialWrapper, { backgroundColor: theme.dialBg, borderColor: theme.cardBorder }]}>
                 <ScrollView 
                   horizontal 
                   showsHorizontalScrollIndicator={false}
@@ -217,7 +364,8 @@ export default function SearchScreen() {
                       >
                         <Text style={[
                           styles.dialText,
-                          isSelected && styles.dialTextActive
+                          { color: theme.textMuted },
+                          isSelected && [styles.dialTextActive, { color: theme.dialTextActive }]
                         ]}>
                           {w}
                         </Text>
@@ -234,13 +382,13 @@ export default function SearchScreen() {
           </ScrollView>
 
           {/* Action button */}
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { backgroundColor: theme.cardBackground, borderTopColor: theme.cardBorder }]}>
             <TouchableOpacity 
               activeOpacity={0.8}
-              style={styles.doneButton}
+              style={[styles.doneButton, { backgroundColor: theme.doneBtnBg }]}
               onPress={handleAddPortion}
             >
-              <Text style={styles.doneButtonText}>Done</Text>
+              <Text style={[styles.doneButtonText, { color: theme.doneBtnText }]}>{t.done}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
