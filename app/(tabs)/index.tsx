@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -285,6 +285,43 @@ export default function DiaryScreen() {
   const [scannedResult, setScannedResult] = useState<any>(null);
   const cameraRef = useRef<CameraView>(null);
 
+  const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('day');
+  const MAX_TREND = TRENDS_DATA[activeTrendTab].max;
+
+  const resultTransition = useSharedValue(0);
+
+  const animatedImageWrapperStyle = useAnimatedStyle(() => {
+    return {
+      height: interpolate(resultTransition.value, [0, 1], [SCREEN_HEIGHT * 0.8, SCREEN_HEIGHT * 0.4]),
+      borderRadius: interpolate(resultTransition.value, [0, 1], [0, 24]),
+    };
+  });
+
+  const animatedDetailsOpacityStyle = useAnimatedStyle(() => {
+    return {
+      opacity: resultTransition.value,
+    };
+  });
+
+  const animatedScanningOverlayStyle = useAnimatedStyle(() => {
+    return {
+      opacity: 1 - resultTransition.value,
+    };
+  });
+
+  const scanLineStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: withRepeat(withTiming(300, { duration: 1500 }), -1, true) }]
+    };
+  });
+
+  const animatedBottomSheetStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: interpolate(resultTransition.value, [0, 1], [SCREEN_HEIGHT, 0]) }],
+    };
+  });
+
+
   useEffect(() => {
     setTempGoal(dailyGoal.toString());
   }, [dailyGoal]);
@@ -310,40 +347,15 @@ export default function DiaryScreen() {
         Alert.alert(t.permissionRequired, t.cameraPermission);
         return;
       }
-      const randomMultiplier = Math.abs(hash % 10) / 10 + 0.5;
-      setMeals(DIARY_MEALS.map(m => ({
-        ...m,
-        calories: m.calories > 0 ? Math.floor(m.calories * randomMultiplier) : 0,
-        items: m.calories > 0 ? [`Mock item for ${day.dateString}`] : [],
-        empty: m.calories === 0,
-      })));
-    }
-  };
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 1,
-      });
-
-      if (!result.canceled) {
-        Alert.alert(t.success, t.photoCaptured);
-        setTimeout(() => {
-          setPendingFood({
-            name: 'AI Identified Food',
-            calories: Math.floor(Math.random() * 300) + 100
-          });
-          setMealSelectorVisible(true);
-        }, 1500);
-      }
+      setScannerStep('camera');
+      setScannedResult(null);
+      setSelectedMealType(null);
+      setIsScanning(true);
     } catch (error) {
       Alert.alert(t.error, t.couldNotOpen);
       console.log(error);
     }
-    setScannerStep('camera');
-    setScannedResult(null);
-    setSelectedMealType(null);
-    setIsScanning(true);
   };
 
   return (
@@ -354,7 +366,7 @@ export default function DiaryScreen() {
         {/* Header Top Row */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <View style={styles.headerTopRow}>
-            <View style={[styles.datePill, { backgroundColor: theme.pillBackground }]}>
+            <TouchableOpacity style={[styles.datePill, { backgroundColor: theme.pillBackground }]}>
               <View style={[styles.dateIconContainer, { borderColor: theme.macroRingBg }]}>
                 <Ionicons name="calendar-outline" size={18} color={theme.textPrimary} />
               </View>
@@ -458,14 +470,23 @@ export default function DiaryScreen() {
           <View style={styles.chartHeader}>
             <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>{t.calorieTrends}</Text>
             <View style={[styles.chartTabs, { backgroundColor: theme.pillBackground }]}>
-              <TouchableOpacity style={[styles.chartTab, styles.chartTabActive]}>
-                <Text style={[styles.chartTabText, styles.chartTabTextActive]}>{t.day}</Text>
+              <TouchableOpacity 
+                style={[styles.chartTab, activeTrendTab === 'day' && styles.chartTabActive]} 
+                onPress={() => setActiveTrendTab('day')}
+              >
+                <Text style={[styles.chartTabText, activeTrendTab === 'day' ? styles.chartTabTextActive : { color: theme.textMuted }]}>{t.day}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.chartTab}>
-                <Text style={[styles.chartTabText, { color: theme.textMuted }]}>{t.week}</Text>
+              <TouchableOpacity 
+                style={[styles.chartTab, activeTrendTab === 'week' && styles.chartTabActive]} 
+                onPress={() => setActiveTrendTab('week')}
+              >
+                <Text style={[styles.chartTabText, activeTrendTab === 'week' ? styles.chartTabTextActive : { color: theme.textMuted }]}>{t.week}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.chartTab}>
-                <Text style={[styles.chartTabText, { color: theme.textMuted }]}>{t.month}</Text>
+              <TouchableOpacity 
+                style={[styles.chartTab, activeTrendTab === 'month' && styles.chartTabActive]} 
+                onPress={() => setActiveTrendTab('month')}
+              >
+                <Text style={[styles.chartTabText, activeTrendTab === 'month' ? styles.chartTabTextActive : { color: theme.textMuted }]}>{t.month}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -488,7 +509,7 @@ export default function DiaryScreen() {
                     <View style={[styles.barTrack, { backgroundColor: theme.pillBackground }]} />
                     <View style={[styles.barFill, { height: `${(item.value / MAX_TREND) * 100}%` }]} />
                   </View>
-                  <Text style={[styles.xAxisText, { color: theme.textMuted }]}>{item.day}</Text>
+                  <Text style={[styles.xAxisText, { color: theme.textMuted }]}>{item.label}</Text>
                 </View>
               ))}
             </View>
@@ -566,45 +587,6 @@ export default function DiaryScreen() {
       </Modal>
 
       {/* Removed Meal Type Selector Modal */}
-
-      {/* Calendar Modal */}
-      <Modal visible={isCalendarModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5 }]}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{t.addToWhichMeal}</Text>
-            {['breakfast', 'lunch', 'dinner', 'snack'].map((mealId) => {
-              const mealConfig = localizedMeals.find(m => m.id === mealId);
-              if (!mealConfig) return null;
-              return (
-                <TouchableOpacity 
-                  key={mealId} 
-                  style={[styles.mealSelectorBtn, { backgroundColor: mealConfig.color + '20' }]} 
-                  onPress={() => {
-                    setMeals(current => current.map(m => {
-                      if (m.id === mealId) {
-                        return {
-                          ...m,
-                          calories: m.calories + pendingFood.calories,
-                          items: [...m.items, pendingFood.name],
-                          empty: false
-                        };
-                      }
-                      return m;
-                    }));
-                    setMealSelectorVisible(false);
-                    setPendingFood(null);
-                  }}
-                >
-                  <Text style={[styles.mealSelectorBtnText, { color: mealConfig.color }]}>{mealConfig.label}</Text>
-                </TouchableOpacity>
-              )
-            })}
-            <TouchableOpacity style={[styles.modalCancelBtn, { marginTop: 12, width: '100%', backgroundColor: theme.pillBackground }]} onPress={() => setMealSelectorVisible(false)}>
-              <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       {/* Custom Camera Scanner Modal */}
       <Modal visible={isScanning} animationType="slide" transparent={false}>

@@ -94,6 +94,32 @@ export default function LoginScreen() {
               weeklyWeightGoal: parseFloat(profile.weekly_weight_goal) || 0.5,
               targetDate: profile.target_date ? new Date(profile.target_date) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
             });
+          } else {
+            // Profile missing (e.g. from email confirmation), create it now
+            const newProfile = {
+              id: data.user.id,
+              email: data.user.email,
+              phone: '',
+              name: data.user.email?.split('@')[0] || 'User',
+              current_weight: 85,
+              starting_weight: 85,
+              target_weight: 82,
+              daily_calorie_goal: 1900,
+              weekly_weight_goal: 0.5,
+            };
+            
+            await supabase.from('profiles').insert(newProfile);
+            
+            MockStore.update({
+              name: newProfile.name,
+              email: newProfile.email || '',
+              profileImage: null,
+              targetWeight: 82,
+              currentWeight: 85,
+              startingWeight: 85,
+              dailyCalorieGoal: 1900,
+              weeklyWeightGoal: 0.5,
+            });
           }
 
           router.replace('/(tabs)');

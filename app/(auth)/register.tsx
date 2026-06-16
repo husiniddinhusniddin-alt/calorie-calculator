@@ -103,7 +103,7 @@ export default function RegisterScreen() {
           return;
         }
 
-        if (data.user) {
+        if (data.session) {
           // Create user profile in profiles table
           const { error: profileError } = await supabase.from('profiles').insert({
             id: data.user.id,
@@ -132,8 +132,9 @@ export default function RegisterScreen() {
           });
 
           router.replace('/(tabs)');
-        } else {
+        } else if (data.user) {
           Alert.alert('Muvaffaqiyatli', 'Ro\'yxatdan o\'tish muvaffaqiyatli! Iltimos, emailingizni tasdiqlang.');
+          router.replace('/(auth)/login');
         }
       } catch (err: any) {
         Alert.alert('Xatolik', err.message || 'Kutilmagan xatolik yuz berdi');
