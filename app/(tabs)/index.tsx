@@ -10,11 +10,12 @@ import {
   TextInput,
   Alert,
   Dimensions,
+  SafeAreaView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Calendar } from 'react-native-calendars';
 import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing, interpolate } from 'react-native-reanimated';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
@@ -22,6 +23,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
 
 const translations = {
   en: {
@@ -158,10 +160,10 @@ const DIARY_MEALS = [
   },
 ];
 
-const DEFAULT_DAILY_GOAL = 1550;
-const DAILY_FATS = 43;
-const DAILY_CARBS = 50;
-const DAILY_PROTEINS = 103;
+const DEFAULT_DAILY_GOAL = 1900;
+const DEFAULT_CARBS_GOAL  = 50;
+const DEFAULT_PROTEIN_GOAL = 103;
+const DEFAULT_FATS_GOAL   = 43;
 
 const TRENDS_DATA = {
   day: {
@@ -248,12 +250,16 @@ export default function DiaryScreen() {
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
   const [dailyGoal, setDailyGoal] = useState(MockStore.dailyCalorieGoal);
+  const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
+  const [userName, setUserName] = useState(MockStore.name);
   
   useEffect(() => {
     return MockStore.subscribe(() => {
       setAppTheme(MockStore.appTheme);
       setLanguage(MockStore.language);
       setDailyGoal(MockStore.dailyCalorieGoal);
+      setProfileImage(MockStore.profileImage);
+      setUserName(MockStore.name);
     });
   }, []);
 
@@ -275,8 +281,107 @@ export default function DiaryScreen() {
     mealEmptyText: isDark ? '#5A684E' : '#BBBBBB',
   };
 
-  const [meals, setMeals] = useState<any[]>(DIARY_MEALS);
+  const [meals, setMeals] = useState<any[]>([
+    { id: 'breakfast', label: 'Breakfast', color: '#F4C344', calories: 0, items: [], empty: true },
+    { id: 'lunch', label: 'Lunch', color: '#7EB93C', calories: 0, items: [], empty: true },
+    { id: 'dinner', label: 'Dinner', color: '#E8A86F', calories: 0, items: [], empty: true },
+    { id: 'snack', label: 'Snack', color: '#A8A4D8', calories: 0, items: [], empty: true },
+  ]);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) setUserId(data.user.id);
+    };
+    getUser();
+  }, []);
+
+  // Macro goals (from profiles table)
+  const [carbsGoal,   setCarbsGoal]   = useState(DEFAULT_CARBS_GOAL);
+  const [proteinGoal, setProteinGoal] = useState(DEFAULT_PROTEIN_GOAL);
+  const [fatGoal,     setFatGoal]     = useState(DEFAULT_FATS_GOAL);
+
+  // Macro totals for the selected day (summed across all meals)
+  const [totalCarbs,   setTotalCarbs]   = useState(0);
+  const [totalProtein, setTotalProtein] = useState(0);
+  const [totalFat,     setTotalFat]     = useState(0);
+
+  // Fetch macro goals AND calorie goal from profiles when userId is known
+  useEffect(() => {
+    if (!userId) return;
+    const fetchGoals = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('daily_calorie_goal, daily_carbs_goal, daily_protein_goal, daily_fat_goal')
+        .eq('id', userId)
+        .single();
+      if (data) {
+        if (data.daily_calorie_goal) {
+          MockStore.update({ dailyCalorieGoal: data.daily_calorie_goal });
+        }
+        if (data.daily_carbs_goal)   setCarbsGoal(data.daily_carbs_goal);
+        if (data.daily_protein_goal) setProteinGoal(data.daily_protein_goal);
+        if (data.daily_fat_goal)     setFatGoal(data.daily_fat_goal);
+      }
+    };
+    fetchGoals();
+  }, [userId]);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
+  const [isCalendarVisible, setCalendarVisible] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchMeals = async () => {
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', selectedDate);
+
+      const baseMeals = [
+        { id: 'breakfast', label: 'Breakfast', color: '#F4C344', calories: 0, items: [], empty: true },
+        { id: 'lunch', label: 'Lunch', color: '#7EB93C', calories: 0, items: [], empty: true },
+        { id: 'dinner', label: 'Dinner', color: '#E8A86F', calories: 0, items: [], empty: true },
+        { id: 'snack', label: 'Snack', color: '#A8A4D8', calories: 0, items: [], empty: true },
+      ];
+
+      if (data && !error) {
+        const updatedMeals = baseMeals.map(emptyMeal => {
+          const found = data.find((d: any) => d.meal_type === emptyMeal.id);
+          if (found) {
+            const items = typeof found.items === 'string' ? JSON.parse(found.items) : (found.items || []);
+            return {
+              ...emptyMeal,
+              calories: found.calories || 0,
+              carbs:    found.carbs    || 0,
+              protein:  found.protein  || 0,
+              fat:      found.fat      || 0,
+              items: items,
+              empty: items.length === 0 && (found.calories || 0) === 0
+            };
+          }
+          return emptyMeal;
+        });
+        setMeals(updatedMeals);
+        // Recalculate daily macro totals
+        setTotalCarbs(updatedMeals.reduce((s: number, m: any) => s + (m.carbs   || 0), 0));
+        setTotalProtein(updatedMeals.reduce((s: number, m: any) => s + (m.protein || 0), 0));
+        setTotalFat(updatedMeals.reduce((s: number, m: any) => s + (m.fat     || 0), 0));
+      } else {
+        setMeals(baseMeals);
+        setTotalCarbs(0); setTotalProtein(0); setTotalFat(0);
+      }
+    };
+    fetchMeals();
+  }, [userId, selectedDate]);
+
+  const dateObj = new Date(selectedDate);
+  const locale = language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-US';
+  const formattedDayName = dateObj.toLocaleDateString(locale, { weekday: 'long' });
+  const formattedDate = dateObj.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+
   const [tempGoal, setTempGoal] = useState(dailyGoal.toString());
   const [selectedMealType, setSelectedMealType] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -286,7 +391,76 @@ export default function DiaryScreen() {
   const cameraRef = useRef<CameraView>(null);
 
   const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('day');
-  const MAX_TREND = TRENDS_DATA[activeTrendTab].max;
+
+  // Real trend chart data from Supabase
+  const [trendChartData, setTrendChartData] = useState<{ label: string; value: number }[]>([]);
+  const [trendMax, setTrendMax] = useState(2000);
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchTrendData = async () => {
+      const today = new Date();
+      let rows: { label: string; value: number }[] = [];
+      let maxVal = 2000;
+
+      if (activeTrendTab === 'day') {
+        // Sum calories per meal for today
+        const { data } = await supabase
+          .from('diary_entries')
+          .select('meal_type, calories')
+          .eq('user_id', userId)
+          .eq('date', selectedDate);
+        const slots = ['8AM','11AM','2PM','5PM','8PM','10PM'];
+        // Map meal entries to time slots with their calories
+        const mealCalMap: Record<string, number> = {};
+        (data || []).forEach((r: any) => { mealCalMap[r.meal_type] = r.calories || 0; });
+        const mealOrder = ['breakfast','lunch','lunch','dinner','dinner','snack'];
+        rows = slots.map((label, i) => ({ label, value: mealCalMap[mealOrder[i]] || 0 }));
+        maxVal = Math.max(2000, ...rows.map(r => r.value));
+
+      } else if (activeTrendTab === 'week') {
+        // Last 7 days: one bar per day
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          const dateStr = d.toISOString().split('T')[0];
+          const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().slice(0,3);
+          const { data } = await supabase
+            .from('diary_entries')
+            .select('calories')
+            .eq('user_id', userId)
+            .eq('date', dateStr);
+          const total = (data || []).reduce((s: number, r: any) => s + (r.calories || 0), 0);
+          rows.push({ label: dayLabel, value: total });
+        }
+        maxVal = Math.max(2000, ...rows.map(r => r.value));
+
+      } else {
+        // Last 4 weeks: one bar per week
+        for (let i = 3; i >= 0; i--) {
+          const weekStart = new Date(today);
+          weekStart.setDate(today.getDate() - i * 7 - today.getDay());
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          const s = weekStart.toISOString().split('T')[0];
+          const e = weekEnd.toISOString().split('T')[0];
+          const { data } = await supabase
+            .from('diary_entries')
+            .select('calories')
+            .eq('user_id', userId)
+            .gte('date', s)
+            .lte('date', e);
+          const total = (data || []).reduce((s2: number, r: any) => s2 + (r.calories || 0), 0);
+          rows.push({ label: `W${4 - i}`, value: total });
+        }
+        maxVal = Math.max(2000, ...rows.map(r => r.value));
+      }
+
+      setTrendChartData(rows);
+      setTrendMax(maxVal);
+    };
+    fetchTrendData();
+  }, [userId, activeTrendTab, selectedDate]);
 
   const resultTransition = useSharedValue(0);
 
@@ -309,9 +483,25 @@ export default function DiaryScreen() {
     };
   });
 
+  const scanLinePosition = useSharedValue(0);
+
+  useEffect(() => {
+    if (isScanning) {
+      scanLinePosition.value = 0;
+      scanLinePosition.value = withRepeat(
+        withTiming(240, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true
+      );
+    } else {
+      // Reset position when not scanning
+      scanLinePosition.value = 0;
+    }
+  }, [isScanning, scanLinePosition]);
+
   const scanLineStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateY: withRepeat(withTiming(300, { duration: 1500 }), -1, true) }]
+      transform: [{ translateY: scanLinePosition.value }]
     };
   });
 
@@ -366,21 +556,30 @@ export default function DiaryScreen() {
         {/* Header Top Row */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <View style={styles.headerTopRow}>
-            <TouchableOpacity style={[styles.datePill, { backgroundColor: theme.pillBackground }]}>
+            <TouchableOpacity 
+              style={[styles.datePill, { backgroundColor: theme.pillBackground }]}
+              onPress={() => setCalendarVisible(true)}
+            >
               <View style={[styles.dateIconContainer, { borderColor: theme.macroRingBg }]}>
                 <Ionicons name="calendar-outline" size={18} color={theme.textPrimary} />
               </View>
               <View>
-                <Text style={[styles.dateDay, { color: theme.textPrimary }]}>{t.monday}</Text>
-                <Text style={[styles.dateFull, { color: theme.textMuted }]}>{t.nov24}</Text>
+                <Text style={[styles.dateDay, { color: theme.textPrimary, textTransform: 'capitalize' }]}>{formattedDayName}</Text>
+                <Text style={[styles.dateFull, { color: theme.textMuted }]}>{formattedDate}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity 
               activeOpacity={0.7}
               onPress={() => router.push('/profile')}
             >
-              <View style={[styles.avatarContainer, { backgroundColor: theme.pillBackground }]}>
-                <Image source={{ uri: 'https://cdn3d.iconscout.com/3d/premium/thumb/woman-avatar-5822527-4898516.png' }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+              <View style={[styles.avatarContainer, { backgroundColor: theme.pillBackground, justifyContent: 'center', alignItems: 'center' }]}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                ) : (
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#7EB93C' }}>
+                    {userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </Text>
+                )}
               </View>
             </TouchableOpacity>
           </View>
@@ -433,8 +632,8 @@ export default function DiaryScreen() {
               <View style={[styles.macroRingFill, { borderTopColor: '#F4C344', borderRightColor: 'transparent', transform: [{ rotate: '45deg' }] }]} />
               <MaterialCommunityIcons name="corn" size={24} color="#F4C344" />
             </View>
-            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>25</Text>
-            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', '50')}</Text>
+            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalCarbs}</Text>
+            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', carbsGoal.toString())}</Text>
             <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
               <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.carbs}</Text>
             </View>
@@ -445,8 +644,8 @@ export default function DiaryScreen() {
               <View style={[styles.macroRingFill, { borderTopColor: '#C93A3E', borderRightColor: '#C93A3E', transform: [{ rotate: '45deg' }] }]} />
               <MaterialCommunityIcons name="food-steak" size={24} color="#C93A3E" />
             </View>
-            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>63</Text>
-            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', '103')}</Text>
+            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalProtein}</Text>
+            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', proteinGoal.toString())}</Text>
             <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
               <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.protein}</Text>
             </View>
@@ -457,8 +656,8 @@ export default function DiaryScreen() {
               <View style={[styles.macroRingFill, { borderTopColor: '#E8A86F', borderRightColor: 'transparent', transform: [{ rotate: '0deg' }] }]} />
               <Ionicons name="water" size={24} color="#E8A86F" />
             </View>
-            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>12</Text>
-            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', '43')}</Text>
+            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalFat}</Text>
+            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', fatGoal.toString())}</Text>
             <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
               <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.fat}</Text>
             </View>
@@ -493,21 +692,21 @@ export default function DiaryScreen() {
           
           <View style={styles.chartBody}>
             <View style={styles.yAxis}>
-              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>3000</Text>
-              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>2500</Text>
-              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>2000</Text>
-              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>1500</Text>
-              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>1000</Text>
-              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>500</Text>
-              <Text style={[styles.yAxisText, { color: theme.textMuted }]}>0</Text>
+              {[trendMax, Math.round(trendMax*0.8), Math.round(trendMax*0.6), Math.round(trendMax*0.4), Math.round(trendMax*0.2), 0].map((v) => (
+                <Text key={v} style={[styles.yAxisText, { color: theme.textMuted }]}>{v}</Text>
+              ))}
             </View>
             
             <View style={styles.barsContainer}>
-              {TRENDS_DATA[activeTrendTab].data.map((item) => (
+              {trendChartData.length === 0 ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: theme.textMuted, fontSize: 12 }}>No data yet</Text>
+                </View>
+              ) : trendChartData.map((item) => (
                 <View key={item.label} style={styles.barCol}>
                   <View style={styles.barWrapper}>
                     <View style={[styles.barTrack, { backgroundColor: theme.pillBackground }]} />
-                    <View style={[styles.barFill, { height: `${(item.value / MAX_TREND) * 100}%` }]} />
+                    <View style={[styles.barFill, { height: `${trendMax > 0 ? (item.value / trendMax) * 100 : 0}%` }]} />
                   </View>
                   <Text style={[styles.xAxisText, { color: theme.textMuted }]}>{item.label}</Text>
                 </View>
@@ -556,6 +755,45 @@ export default function DiaryScreen() {
 
       </ScrollView>
 
+      {/* Calendar Modal */}
+      <Modal visible={isCalendarVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5, padding: 0, overflow: 'hidden' }]}>
+            <Calendar
+              current={selectedDate}
+              onDayPress={(day: any) => {
+                setSelectedDate(day.dateString);
+                setCalendarVisible(false);
+              }}
+              theme={{
+                backgroundColor: theme.cardBackground,
+                calendarBackground: theme.cardBackground,
+                textSectionTitleColor: theme.textSecondary,
+                selectedDayBackgroundColor: '#7EB93C',
+                selectedDayTextColor: '#ffffff',
+                todayTextColor: '#7EB93C',
+                dayTextColor: theme.textPrimary,
+                textDisabledColor: theme.textMuted,
+                dotColor: '#7EB93C',
+                selectedDotColor: '#ffffff',
+                arrowColor: '#7EB93C',
+                monthTextColor: theme.textPrimary,
+                indicatorColor: '#7EB93C',
+              }}
+              markedDates={{
+                [selectedDate]: { selected: true, disableTouchEvent: true }
+              }}
+            />
+            <TouchableOpacity 
+              style={[styles.modalCancelBtn, { backgroundColor: theme.pillBackground, margin: 16 }]} 
+              onPress={() => setCalendarVisible(false)}
+            >
+              <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Edit Goal Modal */}
       <Modal visible={isEditModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -572,10 +810,19 @@ export default function DiaryScreen() {
               <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: theme.pillBackground }]} onPress={() => setEditModalVisible(false)}>
                 <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={() => {
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={async () => {
                 const newGoal = parseInt(tempGoal, 10);
                 if (!isNaN(newGoal) && newGoal > 0) {
                   MockStore.update({ dailyCalorieGoal: newGoal });
+                  if (userId) {
+                    const { error } = await supabase
+                      .from('profiles')
+                      .update({ daily_calorie_goal: newGoal })
+                      .eq('id', userId);
+                    if (error) {
+                      console.error("Error updating goal:", error);
+                    }
+                  }
                 }
                 setEditModalVisible(false);
               }}>
@@ -599,6 +846,7 @@ export default function DiaryScreen() {
                   <View style={[styles.corner, styles.topRight]} />
                   <View style={[styles.corner, styles.bottomLeft]} />
                   <View style={[styles.corner, styles.bottomRight]} />
+                  <Animated.View style={[styles.scanLine, scanLineStyle]} />
                 </View>
                 <Text style={styles.scanText}>Align food in frame</Text>
                 
@@ -739,9 +987,58 @@ export default function DiaryScreen() {
                   <TouchableOpacity 
                     style={[styles.resultAddBtn, !selectedMealType && { opacity: 0.5 }]} 
                     disabled={!selectedMealType}
-                    onPress={() => {
-                      if (selectedMealType) {
-                        setMeals(current => current.map(m => {
+                    onPress={async () => {
+                      if (selectedMealType && userId) {
+                        const targetMeal = meals.find(m => m.id === selectedMealType);
+                        const currentItems    = targetMeal ? targetMeal.items   : [];
+                        const currentCalories = targetMeal ? targetMeal.calories : 0;
+                        const currentCarbs    = targetMeal ? (targetMeal.carbs   || 0) : 0;
+                        const currentProtein  = targetMeal ? (targetMeal.protein || 0) : 0;
+                        const currentFat      = targetMeal ? (targetMeal.fat     || 0) : 0;
+                        
+                        const newItems    = [...currentItems, scannedResult.title];
+                        const newCalories = currentCalories + scannedResult.calories;
+                        const newCarbs    = currentCarbs    + (scannedResult.macros?.carbs   || 0);
+                        const newProtein  = currentProtein  + (scannedResult.macros?.protein || 0);
+                        const newFat      = currentFat      + (scannedResult.macros?.fat     || 0);
+
+                        const updatedMeals = meals.map(m => {
+                          if (m.id === selectedMealType) {
+                            return { ...m, calories: newCalories, carbs: newCarbs, protein: newProtein, fat: newFat, items: newItems, empty: false };
+                          }
+                          return m;
+                        });
+                        setMeals(updatedMeals);
+                        setTotalCarbs(updatedMeals.reduce((s: number, m: any) => s + (m.carbs   || 0), 0));
+                        setTotalProtein(updatedMeals.reduce((s: number, m: any) => s + (m.protein || 0), 0));
+                        setTotalFat(updatedMeals.reduce((s: number, m: any) => s + (m.fat     || 0), 0));
+
+                        setIsScanning(false);
+                        setTimeout(() => {
+                          setScannedResult(null);
+                          setSelectedMealType(null);
+                          setScannerStep('camera');
+                        }, 300);
+
+                        const { error } = await supabase
+                          .from('diary_entries')
+                          .upsert({
+                            user_id: userId,
+                            date: selectedDate,
+                            meal_type: selectedMealType,
+                            calories: newCalories,
+                            carbs:    newCarbs,
+                            protein:  newProtein,
+                            fat:      newFat,
+                            items: JSON.stringify(newItems)
+                          }, { onConflict: 'user_id, date, meal_type' });
+                          
+                        if (error) {
+                          console.error("Error saving to diary_entries:", error);
+                        }
+                      } else if (selectedMealType) {
+                         // Fallback for non-authenticated local usage just in case
+                         setMeals(current => current.map(m => {
                           if (m.id === selectedMealType) {
                             return {
                               ...m,
@@ -1330,9 +1627,9 @@ const styles = StyleSheet.create({
   },
   scanLine: {
     position: 'absolute',
-    top: 0,
-    left: 10,
-    right: 10,
+    top: 4,
+    left: 20,
+    right: 20,
     height: 2,
     backgroundColor: '#7EB93C',
     shadowColor: '#7EB93C',
