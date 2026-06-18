@@ -115,6 +115,7 @@ export default function RegisterScreen() {
             target_weight: 82,
             daily_calorie_goal: 1900,
             weekly_weight_goal: 0.5,
+            target_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
           });
 
           if (profileError) {

@@ -24,8 +24,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { MockStore } from '@/constants/store';
 import { supabase } from '@/constants/supabase';
 
-const CURRENT_WEIGHT = 85; 
-const STARTING_WEIGHT = 88; 
+
 
 const translations = {
   en: {
@@ -143,6 +142,58 @@ export default function GoalSettingScreen() {
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
 
+  // Dynamic weight state from MockStore/Supabase (no more hardcoded constants)
+  const [currentWeight, setCurrentWeight] = useState<number>(MockStore.currentWeight);
+  const [startingWeight, setStartingWeight] = useState<number>(MockStore.startingWeight);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Load goal data from Supabase on mount
+  useEffect(() => {
+    async function loadGoalData() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('target_weight, daily_calorie_goal, weekly_weight_goal, target_date, current_weight, starting_weight')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (profile) {
+            const tw = parseFloat(profile.target_weight) || 82;
+            const dcg = parseFloat(profile.daily_calorie_goal) || 1900;
+            const wwg = parseFloat(profile.weekly_weight_goal) || 0.5;
+            const td = profile.target_date ? new Date(profile.target_date) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+            const cw = parseFloat(profile.current_weight) || 85;
+            const sw = parseFloat(profile.starting_weight) || 88;
+
+            setTargetWeight(tw.toString());
+            setDailyCalorieGoal(dcg.toString());
+            setWeeklyWeightGoal(wwg);
+            setTargetDate(td);
+            setCurrentWeight(cw);
+            setStartingWeight(sw);
+
+            // Sync MockStore with loaded data
+            MockStore.update({
+              targetWeight: tw,
+              dailyCalorieGoal: dcg,
+              weeklyWeightGoal: wwg,
+              targetDate: td,
+              currentWeight: cw,
+              startingWeight: sw,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load goal data from Supabase:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadGoalData();
+  }, []);
+
   // Subscribe to MockStore updates
   useEffect(() => {
     return MockStore.subscribe(() => {
@@ -150,6 +201,8 @@ export default function GoalSettingScreen() {
       setDailyCalorieGoal(MockStore.dailyCalorieGoal.toString());
       setWeeklyWeightGoal(MockStore.weeklyWeightGoal);
       setTargetDate(MockStore.targetDate);
+      setCurrentWeight(MockStore.currentWeight);
+      setStartingWeight(MockStore.startingWeight);
       setAppTheme(MockStore.appTheme);
       setLanguage(MockStore.language);
     });
@@ -188,13 +241,13 @@ export default function GoalSettingScreen() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const parsedTargetWeight = parseFloat(targetWeight) || 0;
-  const weightDiff = CURRENT_WEIGHT - parsedTargetWeight;
+  const weightDiff = currentWeight - parsedTargetWeight;
   const isLoss = weightDiff >= 0;
   const absWeightDiff = Math.abs(weightDiff);
 
-  const totalGoalWeightChange = STARTING_WEIGHT - parsedTargetWeight;
+  const totalGoalWeightChange = startingWeight - parsedTargetWeight;
   const progressPercent = totalGoalWeightChange > 0 
-    ? Math.min(Math.max(((STARTING_WEIGHT - CURRENT_WEIGHT) / totalGoalWeightChange) * 100, 0), 100)
+    ? Math.min(Math.max(((startingWeight - currentWeight) / totalGoalWeightChange) * 100, 0), 100)
     : 0;
 
   const getDaysRemaining = () => {
@@ -209,7 +262,7 @@ export default function GoalSettingScreen() {
 
   const calculateSuggestedCalories = () => {
     const baseTdee = 2400; 
-    if (parsedTargetWeight === CURRENT_WEIGHT) {
+    if (parsedTargetWeight === currentWeight) {
       return baseTdee;
     }
     const weightChangeFactor = isLoss ? -1 : 1;
@@ -311,6 +364,12 @@ export default function GoalSettingScreen() {
   return (
     <PaperProvider>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        {isLoading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color="#7EB93C" />
+          </View>
+        ) : (
+          <>
         <StatusBar style={isDark ? "light" : "dark"} />
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -342,7 +401,7 @@ export default function GoalSettingScreen() {
                 <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.weightGoal}</Text>
                 <View style={[styles.currentWeightBadge, { backgroundColor: theme.background, borderColor: theme.cardBorder }]}>
                   <Text style={[styles.currentWeightLabel, { color: theme.textMuted }]}>{t.current}</Text>
-                  <Text style={[styles.currentWeightValue, { color: theme.textBrand }]}>{CURRENT_WEIGHT} kg</Text>
+                  <Text style={[styles.currentWeightValue, { color: theme.textBrand }]}>{currentWeight} kg</Text>
                 </View>
               </View>
 
@@ -618,6 +677,8 @@ export default function GoalSettingScreen() {
             {snackbarMessage}
           </Snackbar>
         </Portal>
+          </>
+        )}
       </SafeAreaView>
     </PaperProvider>
   );
