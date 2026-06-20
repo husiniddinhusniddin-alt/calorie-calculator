@@ -3,151 +3,219 @@ import {
   StyleSheet,
   Text,
   View,
-  TextInput,
-  TouchableOpacity,
   ScrollView,
-  Image,
-  Dimensions,
+  TouchableOpacity,
   SafeAreaView,
-  Alert,
+  Dimensions,
   useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown, FadeInUp, SlideInRight } from 'react-native-reanimated';
+import Animated, {
+  FadeInDown,
+} from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { MockStore } from '@/constants/store';
+import { Pedometer } from 'expo-sensors';
+import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/constants/supabase';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// ─── Translations ─────────────────────────────────────────────────────────────
 const translations = {
   en: {
-    searchFood: 'Search Food',
-    searchDishes: 'Search dishes...',
-    pasta: 'Pasta',
-    chicken: 'Chicken',
-    vegetables: 'Vegetables',
-    seafood: 'Seafood',
-    addedToDiary: 'Added to Diary',
-    addedMsg: '{name} ({weight}g) has been added.',
-    ok: 'OK',
-    done: 'Done',
-    portionWeightText: 'Your portion in grams',
+    dailyActivity: 'Daily Activity',
+    stepCount: 'Step Count',
+    stepGoal: 'Step Goal',
+    distance: 'Distance',
+    time: 'Time',
+    heart: 'Heart',
+    caloriesEaten: 'Eaten',
+    caloriesBurned: 'Burned',
+    steps: 'Steps',
+    distanceLabel: 'Distance',
+    day: 'Day',
+    week: 'Week',
+    month: 'Month',
+    bpm: 'bpm',
+    km: 'Km',
     kcal: 'kcal',
-    carbohydrates: 'Carbohydrates',
-    proteins: 'Proteins',
-    fats: 'Fats',
-    fatsShort: 'Fats',
-    carbsShort: 'Carbs',
-    protShort: 'Prot',
-    
-    // Dish names
-    carbonaraName: 'Carbonara',
-    milanoName: 'Milano',
-    pestoPastaName: 'Pesto Pasta',
-    
-    // Dish descriptions
-    carbonaraDesc: 'This cheesy pasta dish',
-    milanoDesc: 'Classic Milanese tomato pasta',
-    pestoPastaDesc: 'Fresh basil pesto spaghetti',
   },
   ru: {
-    searchFood: 'Поиск еды',
-    searchDishes: 'Поиск блюд...',
-    pasta: 'Паста',
-    chicken: 'Курица',
-    vegetables: 'Овощи',
-    seafood: 'Морепродукты',
-    addedToDiary: 'Добавлено в дневник',
-    addedMsg: '{name} ({weight}г) было добавлено.',
-    ok: 'OK',
-    done: 'Готово',
-    portionWeightText: 'Ваша порция в граммах',
-    kcal: 'ктал',
-    carbohydrates: 'Углеводы',
-    proteins: 'Белки',
-    fats: 'Жиры',
-    fatsShort: 'Жиры',
-    carbsShort: 'Угл',
-    protShort: 'Бел',
-    
-    carbonaraName: 'Карбонара',
-    milanoName: 'Милано',
-    pestoPastaName: 'Паста с песто',
-    
-    carbonaraDesc: 'Это сырное блюдо из пасты',
-    milanoDesc: 'Классическая миланская томатная паста',
-    pestoPastaDesc: 'Спагетти со свежим базиликовым песто',
+    dailyActivity: 'Активность',
+    stepCount: 'Шагов',
+    stepGoal: 'Цель шагов',
+    distance: 'Дистанция',
+    time: 'Время',
+    heart: 'Пульс',
+    caloriesEaten: 'Съедено',
+    caloriesBurned: 'Сожжено',
+    steps: 'Шагов',
+    distanceLabel: 'Дистанция',
+    day: 'День',
+    week: 'Неделя',
+    month: 'Месяц',
+    bpm: 'уд/м',
+    km: 'Км',
+    kcal: 'ккал',
   },
   uz: {
-    searchFood: 'Taom qidirish',
-    searchDishes: 'Taomlarni qidirish...',
-    pasta: 'Pasta',
-    chicken: 'Tovuq',
-    vegetables: 'Sabzavotlar',
-    seafood: 'Dengiz mahsulotlari',
-    addedToDiary: 'Kundalikka qo\'shildi',
-    addedMsg: '{name} ({weight}g) qo\'shildi.',
-    ok: 'OK',
-    done: 'Tayyor',
-    portionWeightText: 'Sizning porsiyangiz grammda',
+    dailyActivity: 'Faollik',
+    stepCount: 'Qadamlar',
+    stepGoal: 'Qadam maqsadi',
+    distance: 'Masofa',
+    time: 'Vaqt',
+    heart: 'Yurak',
+    caloriesEaten: 'Yeyildi',
+    caloriesBurned: 'Yondirildi',
+    steps: 'Qadamlar',
+    distanceLabel: 'Masofa',
+    day: 'Kun',
+    week: 'Hafta',
+    month: 'Oy',
+    bpm: 'ur/m',
+    km: 'Km',
     kcal: 'kkal',
-    carbohydrates: 'Uglevodlar',
-    proteins: 'Oqsillar',
-    fats: 'Yog\'lar',
-    fatsShort: 'Yog\'',
-    carbsShort: 'Ugl',
-    protShort: 'Oqsil',
-    
-    carbonaraName: 'Karbonara',
-    milanoName: 'Milano',
-    pestoPastaName: 'Pesto Pastasi',
-    
-    carbonaraDesc: 'Bu pishloqli pasta taomi',
-    milanoDesc: 'Klassik Milan pomidorli pastasi',
-    pestoPastaDesc: 'Yangi rayhon pestoli spagetti',
-  }
+  },
 };
 
-const DISH_RESULTS = [
-  {
-    id: '1',
-    name: 'Carbonara',
-    description: 'This cheesy pasta dish',
-    calories: 384,
-    carbs: '51.7g',
-    protein: '16.2g',
-    fats: '10.8g',
-    image: require('@/assets/images/pasta_carbonara.png'),
-    category: 'pasta',
-  },
-  {
-    id: '2',
-    name: 'Milano',
-    description: 'Classic Milanese tomato pasta',
-    calories: 401,
-    carbs: '54.0g',
-    protein: '16.9g',
-    fats: '11.2g',
-    image: require('@/assets/images/pasta_carbonara.png'), // Reuse pasta image
-    category: 'pasta',
-  },
-  {
-    id: '3',
-    name: 'Pesto Pasta',
-    description: 'Fresh basil pesto spaghetti',
-    calories: 342,
-    carbs: '48.2g',
-    protein: '12.4g',
-    fats: '14.1g',
-    image: require('@/assets/images/pasta_carbonara.png'),
-    category: 'vegetables',
+// ─── Week Days ────────────────────────────────────────────────────────────────
+const getWeekDays = () => {
+  const today = new Date();
+  const days = [];
+  for (let i = -2; i <= 2; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    days.push({
+      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      date: d.getDate(),
+      isToday: i === 0,
+    });
   }
-];
+  return days;
+};
 
-export default function SearchScreen() {
+// ─── Circular Step Ring ───────────────────────────────────────────────────────
+const StepRing = ({ steps, goal, isDark, t }: any) => {
+  const size = SCREEN_WIDTH * 0.55;
+  const stroke = 18;
+  const totalDashes = 60;
+  // Ensure we display at least a small portion if > 0, cap at 1
+  const percentage = Math.min(Math.max(steps / goal, 0), 1);
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Dashed ring */}
+      <View style={{ position: 'absolute', width: size, height: size }}>
+        {Array.from({ length: totalDashes }).map((_, i) => {
+          const angle = (360 / totalDashes) * i - 90;
+          const rad = (angle * Math.PI) / 180;
+          const r = size / 2 - stroke / 2;
+          const cx = size / 2 + r * Math.cos(rad);
+          const cy = size / 2 + r * Math.sin(rad);
+          const isFilled = (i / totalDashes) <= percentage && steps > 0;
+          return (
+            <View
+              key={i}
+              style={{
+                position: 'absolute',
+                width: 4,
+                height: stroke,
+                borderRadius: 2,
+                backgroundColor: isFilled
+                  ? '#7EB93C'
+                  : isDark ? '#2A3A1E' : '#E5EDE0',
+                left: cx - 2,
+                top: cy - stroke / 2,
+                transform: [{ rotate: `${angle + 90}deg` }],
+              }}
+            />
+          );
+        })}
+      </View>
+
+      {/* Center text */}
+      <View style={{ alignItems: 'center' }}>
+        <Text style={[styles.ringSteps, { color: isDark ? '#FAFCF8' : '#1A1A1A' }]}>
+          {steps.toLocaleString()}
+        </Text>
+        <Text style={[styles.ringLabel, { color: isDark ? '#9AA88E' : '#666' }]}>{t.stepCount}</Text>
+        <Text style={[styles.ringGoal, { color: isDark ? '#6B785E' : '#999' }]}>
+          {t.stepGoal}: {goal.toLocaleString()}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+// ─── Route Map ────────────────────────────────────────────────────────────────
+const RouteMap = ({ isDark }: { isDark: boolean }) => {
+  const mapBg = isDark ? '#1A2310' : '#EAF3E0';
+  const roadColor = isDark ? '#2A3A20' : '#C8DDB8';
+  const routeColor = '#7EB93C';
+
+  return (
+    <View style={[styles.mapContainer, { backgroundColor: mapBg }]}>
+      {/* Road grid lines */}
+      {[0.2, 0.4, 0.6, 0.8].map((f) => (
+        <View key={`h${f}`} style={[styles.roadH, { top: `${f * 100}%`, backgroundColor: roadColor }]} />
+      ))}
+      {[0.15, 0.35, 0.55, 0.75, 0.9].map((f) => (
+        <View key={`v${f}`} style={[styles.roadV, { left: `${f * 100}%`, backgroundColor: roadColor }]} />
+      ))}
+
+      {/* Route dashed line */}
+      {Array.from({ length: 18 }).map((_, i) => {
+        const progress = i / 17;
+        const x = 0.12 + progress * 0.72;
+        const y = 0.82 - progress * 0.62 + Math.sin(progress * Math.PI) * 0.18;
+        return (
+          <View
+            key={`dot${i}`}
+            style={{
+              position: 'absolute',
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: '#FFFFFF',
+              left: `${x * 100}%`,
+              top: `${y * 100}%`,
+              opacity: 0.9,
+            }}
+          />
+        );
+      })}
+
+      {/* Start pin */}
+      <View style={[styles.mapPin, { left: '11%', bottom: '14%', backgroundColor: '#FFFFFF' }]}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: routeColor }} />
+      </View>
+
+      {/* End pin */}
+      <View style={[styles.mapPinEnd, { right: '14%', top: '12%' }]}>
+        <Ionicons name="location" size={24} color={routeColor} />
+      </View>
+    </View>
+  );
+};
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+export default function PedometerScreen() {
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
-  
+  const [userName] = useState(MockStore.name);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const [stepHistory, setStepHistory] = useState<Record<string, number>>({});
+  const [pastStepCount, setPastStepCount] = useState(0);
+  const [currentStepCount, setCurrentStepCount] = useState(0);
+  const [caloriesEaten, setCaloriesEaten] = useState(0);
+  const [debugMsg, setDebugMsg] = useState('Init...');
+
+  const [selectedDayIdx, setSelectedDayIdx] = useState(2); // index 2 is Today
+  const [activeMode, setActiveMode] = useState(0); // 0=Day, 1=Week, 2=Month
+
   useEffect(() => {
     return MockStore.subscribe(() => {
       setAppTheme(MockStore.appTheme);
@@ -155,517 +223,635 @@ export default function SearchScreen() {
     });
   }, []);
 
+  // 1. Ask permissions & initialize Pedometer
+  useEffect(() => {
+    let subscription: Pedometer.Subscription | null = null;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const initPedometer = async () => {
+      try {
+        // Permissions
+        const locPerm = await Location.getForegroundPermissionsAsync();
+        if (!locPerm.granted && locPerm.canAskAgain) {
+          await Location.requestForegroundPermissionsAsync();
+        }
+        
+        let pedPerm = await Pedometer.getPermissionsAsync();
+        let pStatus = pedPerm.granted ? 'OK' : 'Deny';
+        if (!pedPerm.granted && pedPerm.canAskAgain) {
+          pedPerm = await Pedometer.requestPermissionsAsync();
+          pStatus = pedPerm.granted ? 'OK(asked)' : 'Deny(asked)';
+        }
+
+        // Start Pedometer
+        const isAvailable = await Pedometer.isAvailableAsync();
+        setDebugMsg(`Perm: ${pStatus} | Avail: ${isAvailable}`);
+
+        // Load History
+        const historyStr = await AsyncStorage.getItem('pedometer_history');
+        const loadedHistory = historyStr ? JSON.parse(historyStr) : {};
+        setStepHistory(loadedHistory);
+
+        if (isAvailable) {
+          let baseSteps = loadedHistory[todayStr] || 0;
+          try {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            const end = new Date();
+            const past = await Pedometer.getStepCountAsync(start, end);
+            if (past && past.steps !== undefined) {
+               baseSteps = past.steps;
+            }
+          } catch (e) {
+            // fallback to stored history on error
+          }
+          setPastStepCount(baseSteps);
+
+          subscription = Pedometer.watchStepCount(result => {
+            setCurrentStepCount(result.steps);
+            setDebugMsg(prev => prev.split(' | Live:')[0] + ` | Live: ${result.steps}`);
+          });
+        }
+      } catch (err: any) {
+        setDebugMsg(`Err: ${err.message}`);
+      }
+    };
+
+    initPedometer();
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
+  // 2. Save total steps for today when it updates
+  const todayStr = new Date().toISOString().split('T')[0];
+  const totalTodaySteps = pastStepCount + currentStepCount;
+
+  useEffect(() => {
+    if (totalTodaySteps > 0) {
+      setStepHistory(prev => {
+        const currentVal = prev[todayStr] || 0;
+        const newVal = Math.max(currentVal, totalTodaySteps);
+        if (newVal !== currentVal) {
+          const updated = { ...prev, [todayStr]: newVal };
+          AsyncStorage.setItem('pedometer_history', JSON.stringify(updated));
+          return updated;
+        }
+        return prev;
+      });
+
+      // Sync to Supabase backend
+      if (userId) {
+        const syncTimeout = setTimeout(async () => {
+          const { data } = await supabase
+            .from('diary_entries')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('date', todayStr)
+            .eq('meal_type', 'steps_history')
+            .single();
+
+          if (data) {
+            await supabase
+              .from('diary_entries')
+              .update({ calories: totalTodaySteps })
+              .eq('id', data.id);
+          } else {
+            await supabase
+              .from('diary_entries')
+              .insert({
+                user_id: userId,
+                date: todayStr,
+                meal_type: 'steps_history',
+                calories: totalTodaySteps,
+                items: JSON.stringify(['steps_sync'])
+              });
+          }
+        }, 5000); // 5 sec debounce
+        return () => clearTimeout(syncTimeout);
+      }
+    }
+  }, [totalTodaySteps, todayStr, userId]);
+
+  // 2b. Fetch historical steps from Supabase backend
+  useEffect(() => {
+    if (!userId) return;
+    const fetchStepHistory = async () => {
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .select('date, calories')
+        .eq('user_id', userId)
+        .eq('meal_type', 'steps_history');
+
+      if (data && !error) {
+        setStepHistory(prev => {
+          const newHistory = { ...prev };
+          let changed = false;
+          data.forEach((row: any) => {
+            if ((newHistory[row.date] || 0) < row.calories) {
+              newHistory[row.date] = row.calories;
+              changed = true;
+            }
+          });
+          if (changed) {
+            AsyncStorage.setItem('pedometer_history', JSON.stringify(newHistory));
+            return newHistory;
+          }
+          return prev;
+        });
+      }
+    };
+    fetchStepHistory();
+  }, [userId]);
+
+  // 3. Fetch calories eaten from Supabase
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) setUserId(data.user.id);
+    };
+    getUser();
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchEaten = async () => {
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .select('calories')
+        .eq('user_id', userId)
+        .eq('date', todayStr);
+        
+      if (data && !error) {
+         const total = data.reduce((s: number, m: any) => s + (m.calories || 0), 0);
+         setCaloriesEaten(total);
+      }
+    };
+    fetchEaten();
+  }, [userId, todayStr]);
+
   const systemColorScheme = useColorScheme();
   const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
-  const t = translations[language] || translations.en;
+  const t = translations[language as keyof typeof translations] || translations.en;
 
   const theme = {
     background: isDark ? '#0F140A' : '#F7FAF3',
     cardBackground: isDark ? '#171E10' : '#FFFFFF',
     cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
-    textPrimary: isDark ? '#FAFCF8' : '#1A2310',
-    textSecondary: isDark ? '#9AA88E' : '#555555',
-    textMuted: isDark ? '#6B785E' : '#888888',
-    pillBackground: isDark ? '#23321A' : '#FFFFFF',
-    inputText: isDark ? '#FAFCF8' : '#333333',
-    dialBg: isDark ? '#23321A' : '#F5FAF0',
-    dialTextActive: isDark ? '#FAFCF8' : '#1C2E0A',
-    doneBtnBg: isDark ? '#7EB93C' : '#1C2E0A',
-    doneBtnText: '#FFFFFF',
+    textPrimary: isDark ? '#FAFCF8' : '#1A1A1A',
+    textSecondary: isDark ? '#9AA88E' : '#555',
+    textMuted: isDark ? '#6B785E' : '#888',
+    pillBackground: isDark ? '#23321A' : '#F5FAF0',
   };
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('pasta');
-  const [selectedDish, setSelectedDish] = useState<any | null>(null);
+  const weekDays = getWeekDays();
+  const modes = [t.day, t.week, t.month];
+
+  // Helper to sum steps over a period
+  const getPeriodSteps = (period: number) => {
+    if (period === 0) return totalTodaySteps;
+    const daysToSum = period === 1 ? 7 : 30;
+    let sum = 0;
+    const today = new Date();
+    for(let i=0; i<daysToSum; i++) {
+       const d = new Date(today);
+       d.setDate(d.getDate() - i);
+       const dStr = d.toISOString().split('T')[0];
+       if (i === 0) sum += totalTodaySteps;
+       else sum += (stepHistory[dStr] || 0);
+    }
+    return sum;
+  };
+
+  // Determine what to display based on selected Day
+  const selectedDateObj = new Date();
+  selectedDateObj.setDate(selectedDateObj.getDate() + (selectedDayIdx - 2));
+  const selectedDateString = selectedDateObj.toISOString().split('T')[0];
   
-  // Detail slider state (portion weight in grams)
-  const [portionWeight, setPortionWeight] = useState(214);
-  const weights = Array.from({ length: 11 }, (_, i) => 210 + i);
+  const isSelectedToday = selectedDayIdx === 2;
+  
+  let displaySteps = 0;
+  let displayGoal = 10000;
 
-  const localizedDishes = DISH_RESULTS.map(dish => {
-    let name = dish.name;
-    let description = dish.description;
-    const categoryKey = dish.category as keyof typeof t;
-    const category = t[categoryKey] || dish.category;
-    
-    if (dish.id === '1') {
-      name = t.carbonaraName;
-      description = t.carbonaraDesc;
-    } else if (dish.id === '2') {
-      name = t.milanoName;
-      description = t.milanoDesc;
-    } else if (dish.id === '3') {
-      name = t.pestoPastaName;
-      description = t.pestoPastaDesc;
-    }
-    
-    return {
-      ...dish,
-      name,
-      description,
-      category,
-    };
-  });
+  if (isSelectedToday) {
+    displaySteps = getPeriodSteps(activeMode);
+    displayGoal = 10000 * (activeMode === 0 ? 1 : activeMode === 1 ? 7 : 30);
+  } else {
+    displaySteps = stepHistory[selectedDateString] || 0;
+    displayGoal = 10000;
+  }
 
-  const filteredDishes = localizedDishes.filter(dish => {
-    const matchesQuery = dish.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory ? dish.category.toLowerCase() === (t[selectedCategory as keyof typeof t] || selectedCategory).toLowerCase() : true;
-    return matchesQuery && matchesCategory;
-  });
-
-  const handleAddPortion = () => {
-    if (selectedDish) {
-      Alert.alert(
-        t.addedToDiary,
-        t.addedMsg.replace('{name}', selectedDish.name).replace('{weight}', portionWeight.toString()),
-        [{ text: t.ok, onPress: () => setSelectedDish(null) }]
-      );
-    }
-  };
+  // Derived metrics
+  const activeDistance = (displaySteps * 0.000762).toFixed(2);
+  const activeMinutes = Math.round(displaySteps / 100);
+  const activeHours = Math.floor(activeMinutes / 60);
+  const activeMins = activeMinutes % 60;
+  const activeTimeStr = `${activeHours}:${activeMins.toString().padStart(2, '0')}`;
+  const activeCaloriesBurned = Math.round(displaySteps * 0.04);
+  const heartRate = 92; // Mock heart rate
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      
-      {!selectedDish ? (
-        // SEARCH LIST VIEW
-        <View style={styles.mainView}>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{t.searchFood}</Text>
-          
-          {/* Custom Search Box with voice mic */}
-          <View style={[styles.searchBox, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-            <Ionicons name="search" size={20} color="#7EB93C" style={styles.searchIcon} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.inputText }]}
-              placeholder={t.searchDishes}
-              placeholderTextColor={theme.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <TouchableOpacity style={styles.micButton}>
-              <Ionicons name="mic-outline" size={20} color={theme.textMuted} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* ── Header ── */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={[styles.headerDate, { color: theme.textMuted }]}>
+                {selectedDateObj.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+              <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{t.dailyActivity}</Text>
+            </View>
+            <View style={[styles.avatar, { backgroundColor: theme.pillBackground }]}>
+              <Text style={styles.avatarText}>
+                {userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          {/* DEBUG INFO */}
+          <Text style={{fontSize: 10, color: 'red', marginTop: 4}}>{debugMsg}</Text>
+        </Animated.View>
+
+        {/* ── Week Day Selector ── */}
+        <Animated.View entering={FadeInDown.duration(400).delay(60)} style={styles.weekRow}>
+          {weekDays.map((d, i) => (
+            <TouchableOpacity
+              key={i}
+              onPress={() => setSelectedDayIdx(i)}
+              style={[
+                styles.dayBtn,
+                { borderColor: theme.cardBorder, backgroundColor: theme.cardBackground },
+                selectedDayIdx === i && styles.dayBtnActive,
+              ]}
+            >
+              <Text style={[styles.dayName, { color: theme.textMuted }, selectedDayIdx === i && styles.dayNameActive]}>
+                {d.day}
+              </Text>
+              <Text style={[styles.dayDate, { color: theme.textPrimary }, selectedDayIdx === i && styles.dayDateActive]}>
+                {d.date}
+              </Text>
             </TouchableOpacity>
+          ))}
+        </Animated.View>
+
+        {/* ── Step Ring Card ── */}
+        <Animated.View
+          entering={FadeInDown.duration(400).delay(120)}
+          style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+        >
+          <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+            <StepRing steps={displaySteps} goal={displayGoal} isDark={isDark} t={t} />
           </View>
 
-          {/* Filter Tags */}
-          <View style={styles.tagsContainer}>
-            {['pasta', 'chicken', 'vegetables', 'seafood'].map((cat) => (
+          {/* ── 3 stats below ring ── */}
+          <View style={[styles.statsRow, { borderTopColor: theme.cardBorder }]}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.distance}</Text>
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{activeDistance} <Text style={styles.statUnit}>{t.km}</Text></Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: theme.cardBorder }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.time}</Text>
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{activeTimeStr}</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: theme.cardBorder }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.heart}</Text>
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{heartRate} <Text style={styles.statUnit}>{t.bpm}</Text></Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* ── Activity Mode Tabs (Only visible when Today is selected) ── */}
+        {isSelectedToday && (
+          <Animated.View entering={FadeInDown.duration(400).delay(180)} style={[styles.modeTabs, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            {modes.map((m, i) => (
               <TouchableOpacity
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
-                style={[
-                  styles.tag,
-                  { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder },
-                  selectedCategory === cat && styles.tagActive
-                ]}
+                key={i}
+                onPress={() => setActiveMode(i)}
+                style={[styles.modeTab, activeMode === i && styles.modeTabActive]}
               >
-                <Text style={[
-                  styles.tagText,
-                  { color: theme.textSecondary },
-                  selectedCategory === cat && styles.tagTextActive
-                ]}>
-                  {t[cat as keyof typeof t] || cat}
+                <Text style={[styles.modeTabText, { color: theme.textMuted }, activeMode === i && styles.modeTabTextActive]}>
+                  {m}
                 </Text>
               </TouchableOpacity>
             ))}
+          </Animated.View>
+        )}
+
+        {/* ── Route Map Card ── */}
+        <Animated.View
+          entering={FadeInDown.duration(400).delay(240)}
+          style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, overflow: 'hidden', padding: 0 }]}
+        >
+          <RouteMap isDark={isDark} />
+        </Animated.View>
+
+        {/* ── Stats Grid (2×2) ── */}
+        <Animated.View entering={FadeInDown.duration(400).delay(300)} style={styles.gridRow}>
+          {/* Eaten */}
+          <View style={[styles.gridCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <View style={styles.gridIconRow}>
+              <View style={[styles.gridIconBg, { backgroundColor: '#F4C34422' }]}>
+                <Ionicons name="restaurant" size={18} color="#F4C344" />
+              </View>
+            </View>
+            <Text style={[styles.gridLabel, { color: theme.textMuted }]}>{t.caloriesEaten}</Text>
+            <Text style={[styles.gridValue, { color: theme.textPrimary }]}>
+              {isSelectedToday ? caloriesEaten : 0} <Text style={styles.gridUnit}>{t.kcal}</Text>
+            </Text>
           </View>
 
-          {/* Dishes List */}
-          <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-            {filteredDishes.map((dish, index) => (
-              <Animated.View
-                key={dish.id}
-                entering={FadeInDown.duration(500).delay(index * 100)}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => setSelectedDish(dish)}
-                  style={[styles.dishCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-                >
-                  <Image source={dish.image} style={styles.dishCardImage} />
-                  <View style={styles.dishCardInfo}>
-                    <Text style={styles.dishCardCalories}>{dish.calories} {t.kcal}</Text>
-                    <Text style={[styles.dishCardName, { color: theme.textPrimary }]}>{dish.name}</Text>
-                    <Text style={[styles.dishCardMacros, { color: theme.textMuted }]}>
-                      {t.fatsShort} {dish.fats} • {t.carbsShort} {dish.carbs} • {t.protShort} {dish.protein}
-                    </Text>
-                  </View>
-                  <View style={[styles.arrowContainer, { backgroundColor: theme.pillBackground }]}>
-                    <Ionicons name="chevron-forward" size={20} color="#7EB93C" />
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </ScrollView>
-        </View>
-      ) : (
-        // DISH DETAIL VIEW (CARBONARA SCREEN)
-        <Animated.View entering={SlideInRight.duration(400)} style={[styles.detailView, { backgroundColor: theme.cardBackground }]}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => setSelectedDish(null)}
-          >
-            <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
-          </TouchableOpacity>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScrollContent}>
-            {/* Category / Name Header */}
-            <Text style={styles.detailCategory}>{selectedDish.category.toUpperCase()}</Text>
-            <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>{selectedDish.name}</Text>
-            <Text style={[styles.detailDesc, { color: theme.textMuted }]}>{selectedDish.description}</Text>
-
-            {/* Food Image and Macro Details Container */}
-            <View style={styles.detailBody}>
-              <View style={styles.detailImageContainer}>
-                <Image source={selectedDish.image} style={styles.detailImage} resizeMode="contain" />
-              </View>
-
-              <View style={styles.detailMacros}>
-                <View style={styles.detailCalContainer}>
-                  <Text style={[styles.detailCalLabel, { color: theme.textMuted }]}>{t.kcal}</Text>
-                  <Text style={[styles.detailCalValue, { color: theme.textPrimary }]}>{selectedDish.calories}</Text>
-                </View>
-
-                {/* Macro Items */}
-                <View style={styles.macroRow}>
-                  <View style={[styles.macroDot, { backgroundColor: '#7EB93C' }]} />
-                  <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>{t.carbohydrates}</Text>
-                  <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{selectedDish.carbs}</Text>
-                </View>
-                <View style={styles.macroRow}>
-                  <View style={[styles.macroDot, { backgroundColor: '#FAD02C' }]} />
-                  <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>{t.proteins}</Text>
-                  <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{selectedDish.protein}</Text>
-                </View>
-                <View style={styles.macroRow}>
-                  <View style={[styles.macroDot, { backgroundColor: '#FF8C42' }]} />
-                  <Text style={[styles.macroLabel, { color: theme.textSecondary }]}>{t.fats}</Text>
-                  <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{selectedDish.fats}</Text>
-                </View>
+          {/* Burned */}
+          <View style={[styles.gridCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <View style={styles.gridIconRow}>
+              <View style={[styles.gridIconBg, { backgroundColor: '#E8A86F22' }]}>
+                <Ionicons name="flame" size={18} color="#E8A86F" />
               </View>
             </View>
-
-            {/* Weight Dial Selector */}
-            <View style={styles.weightSelectorContainer}>
-              <Text style={[styles.weightLabel, { color: theme.textMuted }]}>{t.portionWeightText}</Text>
-              <View style={[styles.dialWrapper, { backgroundColor: theme.dialBg, borderColor: theme.cardBorder }]}>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.dialScroll}
-                >
-                  {weights.map((w) => {
-                    const isSelected = portionWeight === w;
-                    return (
-                      <TouchableOpacity 
-                        key={w} 
-                        onPress={() => setPortionWeight(w)}
-                        style={styles.dialItem}
-                      >
-                        <Text style={[
-                          styles.dialText,
-                          { color: theme.textMuted },
-                          isSelected && [styles.dialTextActive, { color: theme.dialTextActive }]
-                        ]}>
-                          {w}
-                        </Text>
-                        <View style={[
-                          styles.dialTick,
-                          isSelected && styles.dialTickActive
-                        ]} />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </View>
-          </ScrollView>
-
-          {/* Action button */}
-          <View style={[styles.bottomBar, { backgroundColor: theme.cardBackground, borderTopColor: theme.cardBorder }]}>
-            <TouchableOpacity 
-              activeOpacity={0.8}
-              style={[styles.doneButton, { backgroundColor: theme.doneBtnBg }]}
-              onPress={handleAddPortion}
-            >
-              <Text style={[styles.doneButtonText, { color: theme.doneBtnText }]}>{t.done}</Text>
-            </TouchableOpacity>
+            <Text style={[styles.gridLabel, { color: theme.textMuted }]}>{t.caloriesBurned}</Text>
+            <Text style={[styles.gridValue, { color: theme.textPrimary }]}>
+              {activeCaloriesBurned} <Text style={styles.gridUnit}>{t.kcal}</Text>
+            </Text>
           </View>
         </Animated.View>
-      )}
+
+        <Animated.View entering={FadeInDown.duration(400).delay(360)} style={styles.gridRow}>
+          {/* Steps */}
+          <View style={[styles.gridCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <View style={styles.gridIconRow}>
+              <View style={[styles.gridIconBg, { backgroundColor: '#7EB93C22' }]}>
+                <Ionicons name="footsteps" size={18} color="#7EB93C" />
+              </View>
+            </View>
+            <Text style={[styles.gridLabel, { color: theme.textMuted }]}>{t.steps}</Text>
+            <Text style={[styles.gridValue, { color: theme.textPrimary }]}>
+              {displaySteps.toLocaleString()}
+            </Text>
+          </View>
+
+          {/* Distance */}
+          <View style={[styles.gridCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <View style={styles.gridIconRow}>
+              <View style={[styles.gridIconBg, { backgroundColor: '#A8A4D822' }]}>
+                <Ionicons name="location" size={18} color="#A8A4D8" />
+              </View>
+            </View>
+            <Text style={[styles.gridLabel, { color: theme.textMuted }]}>{t.distanceLabel}</Text>
+            <Text style={[styles.gridValue, { color: theme.textPrimary }]}>
+              {activeDistance} <Text style={styles.gridUnit}>{t.km}</Text>
+            </Text>
+          </View>
+        </Animated.View>
+
+        <View style={{ height: 24 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAF3',
   },
-  mainView: {
-    flex: 1,
+  scroll: {
     paddingHorizontal: 16,
-    paddingTop: 15,
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
+
+  // Header
+  header: {
+    marginBottom: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerDate: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#3A5C18',
-    marginBottom: 15,
   },
-  searchBox: {
-    flexDirection: 'row',
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    height: 52,
-    borderWidth: 1.5,
-    borderColor: '#EBF2E5',
   },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
+  avatarText: {
     fontSize: 16,
-    color: '#333',
+    fontWeight: '800',
+    color: '#7EB93C',
   },
-  micButton: {
-    padding: 6,
-  },
-  tagsContainer: {
+
+  // Week days
+  weekRow: {
     flexDirection: 'row',
-    marginVertical: 16,
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 6,
   },
-  tag: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+  dayBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
   },
-  tagActive: {
+  dayBtnActive: {
     backgroundColor: '#7EB93C',
     borderColor: '#7EB93C',
   },
-  tagText: {
-    fontSize: 14,
-    color: '#666',
+  dayName: {
+    fontSize: 10,
     fontWeight: '600',
-  },
-  tagTextActive: {
-    color: '#FFFFFF',
-  },
-  listContent: {
-    paddingBottom: 80,
-  },
-  dishCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 16,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#EBF2E5',
-  },
-  dishCardImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginRight: 16,
-  },
-  dishCardInfo: {
-    flex: 1,
-  },
-  dishCardCalories: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7EB93C',
-    marginBottom: 2,
-  },
-  dishCardName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#333333',
     marginBottom: 4,
-  },
-  dishCardMacros: {
-    fontSize: 12,
-    color: '#888',
-  },
-  arrowContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F5FAF0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // DETAIL VIEW STYLES
-  detailView: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  backButton: {
-    padding: 16,
-    alignSelf: 'flex-start',
-  },
-  detailScrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 100,
-  },
-  detailCategory: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7EB93C',
-    letterSpacing: 1,
-  },
-  detailTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1A1A1A',
-    marginTop: 4,
-  },
-  detailDesc: {
-    fontSize: 16,
-    color: '#777777',
-    marginTop: 4,
-    marginBottom: 20,
-  },
-  detailBody: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 30,
-  },
-  detailImageContainer: {
-    width: width * 0.45,
-    height: width * 0.45,
-    borderRadius: (width * 0.45) / 2,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  detailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  detailMacros: {
-    flex: 1,
-    marginLeft: 20,
-  },
-  detailCalContainer: {
-    marginBottom: 15,
-  },
-  detailCalLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#888',
     textTransform: 'uppercase',
   },
-  detailCalValue: {
-    fontSize: 38,
+  dayNameActive: {
+    color: '#FFFFFF',
+  },
+  dayDate: {
+    fontSize: 15,
     fontWeight: '800',
-    color: '#1A1A1A',
-    lineHeight: 42,
   },
-  macroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+  dayDateActive: {
+    color: '#FFFFFF',
   },
-  macroDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  macroLabel: {
-    fontSize: 12,
-    color: '#666',
-    flex: 1,
-  },
-  macroVal: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#333',
-  },
-  weightSelectorContainer: {
-    marginTop: 10,
-  },
-  weightLabel: {
-    fontSize: 14,
-    color: '#888',
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-  dialWrapper: {
-    backgroundColor: '#F5FAF0',
+
+  // Card
+  card: {
     borderRadius: 24,
-    height: 90,
-    justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 3,
   },
-  dialScroll: {
-    paddingHorizontal: 20,
+
+  // Ring stats row
+  statsRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1.5,
+    marginTop: 16,
+    paddingTop: 16,
+  },
+  statItem: {
+    flex: 1,
     alignItems: 'center',
   },
-  dialItem: {
-    alignItems: 'center',
-    width: 60,
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  dialText: {
-    fontSize: 16,
-    color: '#A9A9A9',
+  statValue: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  statUnit: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statDivider: {
+    width: 1.5,
+    height: 40,
+    alignSelf: 'center',
+  },
+
+  // Ring text
+  ringSteps: {
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  ringLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  ringGoal: {
+    fontSize: 11,
     fontWeight: '500',
+    marginTop: 2,
   },
-  dialTextActive: {
-    fontSize: 22,
-    color: '#1C2E0A',
+
+  // Mode tabs
+  modeTabs: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 4,
+    marginBottom: 16,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modeTabActive: {
+    backgroundColor: '#7EB93C',
+  },
+  modeTabText: {
+    fontSize: 13,
     fontWeight: '700',
   },
-  dialTick: {
-    width: 2,
-    height: 10,
-    backgroundColor: '#CCD8C0',
-    marginTop: 8,
+  modeTabTextActive: {
+    color: '#FFFFFF',
   },
-  dialTickActive: {
-    backgroundColor: '#7EB93C',
-    height: 18,
-    width: 3,
+
+  // Map
+  mapContainer: {
+    height: 200,
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 22,
   },
-  bottomBar: {
+  roadH: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 25,
-    paddingTop: 15,
-    paddingHorizontal: 24,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1.5,
-    borderTopColor: '#EBF2E5',
+    height: 10,
+    opacity: 0.5,
   },
-  doneButton: {
-    backgroundColor: '#1C2E0A',
-    borderRadius: 30,
-    height: 58,
+  roadV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 10,
+    opacity: 0.5,
+  },
+  mapPin: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  mapPinEnd: {
+    position: 'absolute',
+  },
+
+  // 2×2 stat grid
+  gridRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  gridCard: {
+    flex: 1,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 3,
+  },
+  gridIconRow: {
+    marginBottom: 10,
+  },
+  gridIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  doneButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
+  gridLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  gridValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  gridUnit: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

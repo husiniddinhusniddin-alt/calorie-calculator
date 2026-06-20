@@ -8,9 +8,9 @@ import { MockStore } from '@/constants/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const tabTranslations = {
-  en: { home: 'Home', calories: 'Calories', goal: 'Goal', history: 'History', profile: 'Profile' },
-  ru: { home: 'Главная', calories: 'Калории', goal: 'Цель', history: 'История', profile: 'Профиль' },
-  uz: { home: 'Bosh sahifa', calories: 'Kaloriyalar', goal: 'Maqsad', history: 'Tarix', profile: 'Profil' }
+  en: { home: 'Home', calories: 'Pedometer', goal: 'Goal', history: 'History', profile: 'Profile' },
+  ru: { home: 'Главная', calories: 'Шагомер', goal: 'Цель', history: 'История', profile: 'Профиль' },
+  uz: { home: 'Bosh sahifa', calories: 'Qadamlar', goal: 'Maqsad', history: 'Tarix', profile: 'Profil' }
 };
 
 export default function TabLayout() {
@@ -58,7 +58,7 @@ export default function TabLayout() {
         options={{
           title: t.calories,
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons size={24} name={focused ? 'flame' : 'flame-outline'} color={color} />
+            <Ionicons size={24} name={focused ? 'footsteps' : 'footsteps-outline'} color={color} />
           ),
         }}
       />
