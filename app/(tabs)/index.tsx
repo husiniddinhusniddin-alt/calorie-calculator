@@ -5,13 +5,14 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  Image,
   Modal,
   TextInput,
   Alert,
   Dimensions,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -161,9 +162,9 @@ const DIARY_MEALS = [
 ];
 
 const DEFAULT_DAILY_GOAL = 1900;
-const DEFAULT_CARBS_GOAL  = 50;
-const DEFAULT_PROTEIN_GOAL = 103;
-const DEFAULT_FATS_GOAL   = 43;
+const DEFAULT_CARBS_GOAL  = 238; // (1900 * 0.5) / 4
+const DEFAULT_PROTEIN_GOAL = 143; // (1900 * 0.3) / 4
+const DEFAULT_FATS_GOAL   = 42; // (1900 * 0.2) / 9
 
 const TRENDS_DATA = {
   day: {
@@ -244,6 +245,122 @@ const DashedGauge = ({ percentage, radius, strokeWidth, filledColor, unfilledCol
   );
 };
 
+const MacroRing = ({ percentage, color, unfilledColor, children }: any) => {
+  const size = 60;
+  const stroke = 4;
+  const radius = size / 2;
+  const angle = Math.min(Math.max(percentage, 0), 1) * 360;
+
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+      {/* Base background ring */}
+      <View style={{ position: 'absolute', width: size, height: size, borderRadius: radius, borderWidth: stroke, borderColor: unfilledColor }} />
+      
+      {/* Right half container */}
+      <View style={{ position: 'absolute', width: radius, height: size, right: 0, overflow: 'hidden' }}>
+        <View style={{
+          width: size, height: size, borderRadius: radius, borderWidth: stroke,
+          borderColor: 'transparent', borderTopColor: color, borderRightColor: color,
+          position: 'absolute', right: 0,
+          transform: [{ rotate: '-135deg' }, { rotate: `${Math.min(angle, 180)}deg` }]
+        }} />
+      </View>
+
+      {/* Left half container */}
+      {angle > 180 && (
+        <View style={{ position: 'absolute', width: radius, height: size, left: 0, overflow: 'hidden' }}>
+          <View style={{
+            width: size, height: size, borderRadius: radius, borderWidth: stroke,
+            borderColor: 'transparent', borderBottomColor: color, borderLeftColor: color,
+            position: 'absolute', left: 0,
+            transform: [{ rotate: '-135deg' }, { rotate: `${angle - 180}deg` }]
+          }} />
+        </View>
+      )}
+
+      {children}
+    </View>
+  );
+};
+
+const AnimatedBarFill = ({ percentage, style }: { percentage: number, style: any }) => {
+  const heightProgress = useSharedValue(0);
+
+  useEffect(() => {
+    heightProgress.value = withTiming(percentage, { duration: 600, easing: Easing.out(Easing.exp) });
+  }, [percentage]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      height: `${heightProgress.value}%`,
+    };
+  });
+
+  return <Animated.View style={[style, animatedStyle]} />;
+};
+
+const SkeletonItem = ({ style, isDark }: { style: any, isDark: boolean }) => {
+  const opacity = useSharedValue(0.4);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withTiming(0.8, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return <Animated.View style={[style, animatedStyle, { backgroundColor: isDark ? '#333' : '#E2E8F0' }]} />;
+};
+
+const analyzeFoodWithAI = async (base64Image: string) => {
+  const { data: secretData, error: secretError } = await supabase
+    .from('secrets')
+    .select('value')
+    .eq('name', 'OPENAI_API_KEY')
+    .single();
+
+  if (secretError || !secretData?.value) {
+    throw new Error('OpenAI API Key not found in Supabase secrets table');
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${secretData.value}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Analyze this food image. Provide exact estimated calories, carbs, protein, and fat. Return ONLY a JSON object in this format (no markdown formatting): { \"title\": \"Name of dish\", \"subtitle\": \"Short desc\", \"serving\": 1, \"calories\": 400, \"macros\": { \"carbs\": 20, \"protein\": 10, \"fat\": 15 }, \"ingredients\": [ { \"name\": \"Ingredient\", \"weight\": \"100g\", \"calories\": 200, \"carbs\": 10, \"protein\": 5, \"fat\": 10 } ] } If there are multiple ingredients, list them. Ensure all macros numbers are integers." },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Image}`
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 500,
+      response_format: { type: "json_object" }
+    })
+  });
+
+  const data = await response.json();
+  if (data.choices && data.choices.length > 0) {
+    const content = data.choices[0].message.content;
+    return JSON.parse(content);
+  }
+  throw new Error("Failed to analyze image");
+};
+
 export default function DiaryScreen() {
   const router = useRouter();
   
@@ -313,16 +430,17 @@ export default function DiaryScreen() {
     const fetchGoals = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('daily_calorie_goal, daily_carbs_goal, daily_protein_goal, daily_fat_goal')
+        .select('daily_calorie_goal')
         .eq('id', userId)
         .single();
       if (data) {
         if (data.daily_calorie_goal) {
-          MockStore.update({ dailyCalorieGoal: data.daily_calorie_goal });
+          const goal = data.daily_calorie_goal;
+          MockStore.update({ dailyCalorieGoal: goal });
+          setCarbsGoal(Math.round((goal * 0.50) / 4));
+          setProteinGoal(Math.round((goal * 0.30) / 4));
+          setFatGoal(Math.round((goal * 0.20) / 9));
         }
-        if (data.daily_carbs_goal)   setCarbsGoal(data.daily_carbs_goal);
-        if (data.daily_protein_goal) setProteinGoal(data.daily_protein_goal);
-        if (data.daily_fat_goal)     setFatGoal(data.daily_fat_goal);
       }
     };
     fetchGoals();
@@ -382,7 +500,23 @@ export default function DiaryScreen() {
   const formattedDayName = dateObj.toLocaleDateString(locale, { weekday: 'long' });
   const formattedDate = dateObj.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 
+  const [isFetching, setIsFetching] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    setIsFetching(true);
+    const fetchAll = async () => {
+      // Fake delay to ensure a smooth, visible loading screen during tab/date switch
+      await new Promise(res => setTimeout(res, 500)); 
+      setIsFetching(false);
+    };
+    fetchAll();
+  }, [userId, selectedDate, activeTrendTab]);
+
   const [tempGoal, setTempGoal] = useState(dailyGoal.toString());
+  const [tempCarbs, setTempCarbs] = useState(carbsGoal.toString());
+  const [tempProtein, setTempProtein] = useState(proteinGoal.toString());
+  const [tempFat, setTempFat] = useState(fatGoal.toString());
   const [selectedMealType, setSelectedMealType] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scannerStep, setScannerStep] = useState<'camera' | 'processing'>('camera');
@@ -419,24 +553,50 @@ export default function DiaryScreen() {
         maxVal = Math.max(2000, ...rows.map(r => r.value));
 
       } else if (activeTrendTab === 'week') {
-        // Last 7 days: one bar per day
+        // Fetch last 7 days in a single query
+        const dStart = new Date(today);
+        dStart.setDate(today.getDate() - 6);
+        const startDateStr = dStart.toISOString().split('T')[0];
+        const endDateStr = today.toISOString().split('T')[0];
+
+        const { data } = await supabase
+          .from('diary_entries')
+          .select('date, calories')
+          .eq('user_id', userId)
+          .gte('date', startDateStr)
+          .lte('date', endDateStr);
+
         for (let i = 6; i >= 0; i--) {
           const d = new Date(today);
           d.setDate(today.getDate() - i);
           const dateStr = d.toISOString().split('T')[0];
           const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().slice(0,3);
-          const { data } = await supabase
-            .from('diary_entries')
-            .select('calories')
-            .eq('user_id', userId)
-            .eq('date', dateStr);
-          const total = (data || []).reduce((s: number, r: any) => s + (r.calories || 0), 0);
+          
+          const total = (data || [])
+            .filter((r: any) => r.date === dateStr)
+            .reduce((s: number, r: any) => s + (r.calories || 0), 0);
+            
           rows.push({ label: dayLabel, value: total });
         }
         maxVal = Math.max(2000, ...rows.map(r => r.value));
 
       } else {
-        // Last 4 weeks: one bar per week
+        // Fetch last 4 weeks in a single query
+        const wsStart = new Date(today);
+        wsStart.setDate(today.getDate() - 3 * 7 - today.getDay());
+        const startDateStr = wsStart.toISOString().split('T')[0];
+
+        const weEnd = new Date(today);
+        weEnd.setDate(today.getDate() - today.getDay() + 6);
+        const endDateStr = weEnd.toISOString().split('T')[0];
+
+        const { data } = await supabase
+          .from('diary_entries')
+          .select('date, calories')
+          .eq('user_id', userId)
+          .gte('date', startDateStr)
+          .lte('date', endDateStr);
+
         for (let i = 3; i >= 0; i--) {
           const weekStart = new Date(today);
           weekStart.setDate(today.getDate() - i * 7 - today.getDay());
@@ -444,13 +604,11 @@ export default function DiaryScreen() {
           weekEnd.setDate(weekStart.getDate() + 6);
           const s = weekStart.toISOString().split('T')[0];
           const e = weekEnd.toISOString().split('T')[0];
-          const { data } = await supabase
-            .from('diary_entries')
-            .select('calories')
-            .eq('user_id', userId)
-            .gte('date', s)
-            .lte('date', e);
-          const total = (data || []).reduce((s2: number, r: any) => s2 + (r.calories || 0), 0);
+          
+          const total = (data || [])
+            .filter((r: any) => r.date >= s && r.date <= e)
+            .reduce((s2: number, r: any) => s2 + (r.calories || 0), 0);
+            
           rows.push({ label: `W${4 - i}`, value: total });
         }
         maxVal = Math.max(2000, ...rows.map(r => r.value));
@@ -463,6 +621,15 @@ export default function DiaryScreen() {
   }, [userId, activeTrendTab, selectedDate]);
 
   const resultTransition = useSharedValue(0);
+
+  const trendTabsList = ['day', 'week', 'month'];
+  const activeTabIndex = trendTabsList.indexOf(activeTrendTab);
+  
+  const animatedTabIndicatorStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: withTiming(activeTabIndex * 60, { duration: 400, easing: Easing.out(Easing.exp) }) }]
+    };
+  });
 
   const animatedImageWrapperStyle = useAnimatedStyle(() => {
     return {
@@ -514,7 +681,10 @@ export default function DiaryScreen() {
 
   useEffect(() => {
     setTempGoal(dailyGoal.toString());
-  }, [dailyGoal]);
+    setTempCarbs(carbsGoal.toString());
+    setTempProtein(proteinGoal.toString());
+    setTempFat(fatGoal.toString());
+  }, [dailyGoal, carbsGoal, proteinGoal, fatGoal]);
 
   const totalCalories = meals.reduce((sum, m) => sum + m.calories, 0);
 
@@ -585,6 +755,26 @@ export default function DiaryScreen() {
           </View>
         </Animated.View>
 
+        {isFetching ? (
+          <View style={{ marginTop: 0 }}>
+            {/* Target Card Skeleton */}
+            <SkeletonItem style={{ height: 260, borderRadius: 24, marginBottom: 16 }} isDark={isDark} />
+            {/* Macros Skeleton */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, gap: 12 }}>
+              <SkeletonItem style={{ flex: 1, height: 120, borderRadius: 24 }} isDark={isDark} />
+              <SkeletonItem style={{ flex: 1, height: 120, borderRadius: 24 }} isDark={isDark} />
+              <SkeletonItem style={{ flex: 1, height: 120, borderRadius: 24 }} isDark={isDark} />
+            </View>
+            {/* Trend Chart Skeleton */}
+            <SkeletonItem style={{ height: 250, borderRadius: 24, marginBottom: 16 }} isDark={isDark} />
+            {/* Meal Cards Skeleton */}
+            <SkeletonItem style={{ height: 80, borderRadius: 24, marginBottom: 14 }} isDark={isDark} />
+            <SkeletonItem style={{ height: 80, borderRadius: 24, marginBottom: 14 }} isDark={isDark} />
+            <SkeletonItem style={{ height: 80, borderRadius: 24, marginBottom: 14 }} isDark={isDark} />
+            <SkeletonItem style={{ height: 80, borderRadius: 24, marginBottom: 14 }} isDark={isDark} />
+          </View>
+        ) : (
+          <>
         {/* Daily Calorie Target Gauge */}
         <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.targetCard, { backgroundColor: theme.cardBackground }]}>
           <TouchableOpacity 
@@ -627,11 +817,9 @@ export default function DiaryScreen() {
         {/* Macros Row */}
         <Animated.View entering={FadeInDown.duration(500).delay(150)} style={styles.macrosRow}>
           <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
-            <View style={styles.macroRingWrapper}>
-              <View style={[styles.macroRingBg, { borderColor: theme.macroRingBg }]} />
-              <View style={[styles.macroRingFill, { borderTopColor: '#F4C344', borderRightColor: 'transparent', transform: [{ rotate: '45deg' }] }]} />
+            <MacroRing percentage={carbsGoal ? totalCarbs / carbsGoal : 0} color="#F4C344" unfilledColor={theme.macroRingBg}>
               <MaterialCommunityIcons name="corn" size={24} color="#F4C344" />
-            </View>
+            </MacroRing>
             <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalCarbs}</Text>
             <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', carbsGoal.toString())}</Text>
             <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
@@ -639,11 +827,9 @@ export default function DiaryScreen() {
             </View>
           </View>
           <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
-            <View style={styles.macroRingWrapper}>
-              <View style={[styles.macroRingBg, { borderColor: theme.macroRingBg }]} />
-              <View style={[styles.macroRingFill, { borderTopColor: '#C93A3E', borderRightColor: '#C93A3E', transform: [{ rotate: '45deg' }] }]} />
+            <MacroRing percentage={proteinGoal ? totalProtein / proteinGoal : 0} color="#C93A3E" unfilledColor={theme.macroRingBg}>
               <MaterialCommunityIcons name="food-steak" size={24} color="#C93A3E" />
-            </View>
+            </MacroRing>
             <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalProtein}</Text>
             <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', proteinGoal.toString())}</Text>
             <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
@@ -651,11 +837,9 @@ export default function DiaryScreen() {
             </View>
           </View>
           <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
-            <View style={styles.macroRingWrapper}>
-              <View style={[styles.macroRingBg, { borderColor: theme.macroRingBg }]} />
-              <View style={[styles.macroRingFill, { borderTopColor: '#E8A86F', borderRightColor: 'transparent', transform: [{ rotate: '0deg' }] }]} />
+            <MacroRing percentage={fatGoal ? totalFat / fatGoal : 0} color="#E8A86F" unfilledColor={theme.macroRingBg}>
               <Ionicons name="water" size={24} color="#E8A86F" />
-            </View>
+            </MacroRing>
             <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalFat}</Text>
             <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', fatGoal.toString())}</Text>
             <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
@@ -668,25 +852,28 @@ export default function DiaryScreen() {
         <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[styles.chartCard, { backgroundColor: theme.cardBackground }]}>
           <View style={styles.chartHeader}>
             <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>{t.calorieTrends}</Text>
-            <View style={[styles.chartTabs, { backgroundColor: theme.pillBackground }]}>
-              <TouchableOpacity 
-                style={[styles.chartTab, activeTrendTab === 'day' && styles.chartTabActive]} 
-                onPress={() => setActiveTrendTab('day')}
-              >
-                <Text style={[styles.chartTabText, activeTrendTab === 'day' ? styles.chartTabTextActive : { color: theme.textMuted }]}>{t.day}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.chartTab, activeTrendTab === 'week' && styles.chartTabActive]} 
-                onPress={() => setActiveTrendTab('week')}
-              >
-                <Text style={[styles.chartTabText, activeTrendTab === 'week' ? styles.chartTabTextActive : { color: theme.textMuted }]}>{t.week}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.chartTab, activeTrendTab === 'month' && styles.chartTabActive]} 
-                onPress={() => setActiveTrendTab('month')}
-              >
-                <Text style={[styles.chartTabText, activeTrendTab === 'month' ? styles.chartTabTextActive : { color: theme.textMuted }]}>{t.month}</Text>
-              </TouchableOpacity>
+            <View style={[styles.chartTabs, { backgroundColor: theme.pillBackground, position: 'relative', overflow: 'hidden' }]}>
+              <Animated.View style={[{
+                position: 'absolute',
+                top: 4,
+                bottom: 4,
+                left: 4,
+                width: 60,
+                backgroundColor: '#7EB93C',
+                borderRadius: 6,
+              }, animatedTabIndicatorStyle]} />
+              
+              {trendTabsList.map((tab) => (
+                <TouchableOpacity 
+                  key={tab}
+                  style={[styles.chartTab, { width: 60, alignItems: 'center', backgroundColor: 'transparent' }]} 
+                  onPress={() => setActiveTrendTab(tab as any)}
+                >
+                  <Text style={[styles.chartTabText, activeTrendTab === tab ? styles.chartTabTextActive : { color: theme.textMuted }]}>
+                    {t[tab as keyof typeof t] || tab}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
           
@@ -706,7 +893,10 @@ export default function DiaryScreen() {
                 <View key={item.label} style={styles.barCol}>
                   <View style={styles.barWrapper}>
                     <View style={[styles.barTrack, { backgroundColor: theme.pillBackground }]} />
-                    <View style={[styles.barFill, { height: `${trendMax > 0 ? (item.value / trendMax) * 100 : 0}%` }]} />
+                    <AnimatedBarFill 
+                      percentage={trendMax > 0 ? (item.value / trendMax) * 100 : 0} 
+                      style={styles.barFill} 
+                    />
                   </View>
                   <Text style={[styles.xAxisText, { color: theme.textMuted }]}>{item.label}</Text>
                 </View>
@@ -721,7 +911,11 @@ export default function DiaryScreen() {
             key={meal.id}
             entering={FadeInDown.duration(500).delay(150 + index * 80)}
           >
-            <TouchableOpacity activeOpacity={0.85} style={[styles.mealCard, { backgroundColor: theme.cardBackground, borderColor: theme.mealBorder }]}>
+            <TouchableOpacity 
+              activeOpacity={0.85} 
+              style={[styles.mealCard, { backgroundColor: theme.cardBackground, borderColor: theme.mealBorder }]}
+              onPress={() => router.push('/history')}
+            >
               {/* Left color stripe */}
               <View style={[styles.mealStripe, { backgroundColor: meal.color }]} />
 
@@ -741,17 +935,19 @@ export default function DiaryScreen() {
                   <Text style={[styles.mealEmptyText, { color: theme.mealEmptyText }]}>{t.noProducts}</Text>
                 ) : (
                   meal.items.map((item: string, i: number) => (
-                    <Text key={i} style={[styles.mealItemText, { color: theme.textSecondary }]}>• {item}</Text>
+                    <Text key={i} style={[styles.mealItemText, { color: theme.textSecondary }]} numberOfLines={1}>• {item}</Text>
                   ))
                 )}
               </View>
 
-              <TouchableOpacity style={styles.mealAddBtn}>
-                <Ionicons name="add" size={20} color={meal.color} />
-              </TouchableOpacity>
+              <View style={{ paddingRight: 16 }}>
+                <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+              </View>
             </TouchableOpacity>
           </Animated.View>
         ))}
+          </>
+        )}
 
       </ScrollView>
 
@@ -797,27 +993,100 @@ export default function DiaryScreen() {
       {/* Edit Goal Modal */}
       <Modal visible={isEditModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5 }]}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{t.updateDailyGoal}</Text>
-            <TextInput
-              style={[styles.modalInput, { backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
-              keyboardType="numeric"
-              value={tempGoal}
-              onChangeText={setTempGoal}
-              autoFocus
-            />
+          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5, width: '85%' }]}>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary, marginBottom: 8 }]}>{t.updateDailyGoal}</Text>
+            <Text style={{fontSize: 13, color: theme.textMuted, marginBottom: 20, textAlign: 'center'}}>
+              Edit total calories or specific macros. Calories will recalculate automatically.
+            </Text>
+
+            <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12}}>
+              <Text style={{width: 90, color: theme.textSecondary, fontWeight: '600'}}>Calories</Text>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
+                keyboardType="numeric"
+                value={tempGoal}
+                onChangeText={(val) => {
+                  setTempGoal(val);
+                  const parsed = parseInt(val, 10);
+                  if (!isNaN(parsed) && parsed > 0) {
+                    setTempCarbs(Math.round((parsed * 0.50) / 4).toString());
+                    setTempProtein(Math.round((parsed * 0.30) / 4).toString());
+                    setTempFat(Math.round((parsed * 0.20) / 9).toString());
+                  }
+                }}
+              />
+            </View>
+
+            <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12}}>
+              <Text style={{width: 90, color: theme.textSecondary, fontWeight: '600'}}>Carbs (g)</Text>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
+                keyboardType="numeric"
+                value={tempCarbs}
+                onChangeText={(val) => {
+                  setTempCarbs(val);
+                  const c = parseInt(val, 10) || 0;
+                  const p = parseInt(tempProtein, 10) || 0;
+                  const f = parseInt(tempFat, 10) || 0;
+                  setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
+                }}
+              />
+            </View>
+
+            <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12}}>
+              <Text style={{width: 90, color: theme.textSecondary, fontWeight: '600'}}>Protein (g)</Text>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
+                keyboardType="numeric"
+                value={tempProtein}
+                onChangeText={(val) => {
+                  setTempProtein(val);
+                  const c = parseInt(tempCarbs, 10) || 0;
+                  const p = parseInt(val, 10) || 0;
+                  const f = parseInt(tempFat, 10) || 0;
+                  setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
+                }}
+              />
+            </View>
+
+            <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 20}}>
+              <Text style={{width: 90, color: theme.textSecondary, fontWeight: '600'}}>Fat (g)</Text>
+              <TextInput
+                style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
+                keyboardType="numeric"
+                value={tempFat}
+                onChangeText={(val) => {
+                  setTempFat(val);
+                  const c = parseInt(tempCarbs, 10) || 0;
+                  const p = parseInt(tempProtein, 10) || 0;
+                  const f = parseInt(val, 10) || 0;
+                  setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
+                }}
+              />
+            </View>
+
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: theme.pillBackground }]} onPress={() => setEditModalVisible(false)}>
                 <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSaveBtn} onPress={async () => {
                 const newGoal = parseInt(tempGoal, 10);
+                const newCarbs = parseInt(tempCarbs, 10);
+                const newProtein = parseInt(tempProtein, 10);
+                const newFat = parseInt(tempFat, 10);
+
                 if (!isNaN(newGoal) && newGoal > 0) {
                   MockStore.update({ dailyCalorieGoal: newGoal });
+                  setCarbsGoal(newCarbs || 0);
+                  setProteinGoal(newProtein || 0);
+                  setFatGoal(newFat || 0);
+                  
                   if (userId) {
                     const { error } = await supabase
                       .from('profiles')
-                      .update({ daily_calorie_goal: newGoal })
+                      .update({ 
+                        daily_calorie_goal: newGoal
+                      })
                       .eq('id', userId);
                     if (error) {
                       console.error("Error updating goal:", error);
@@ -856,19 +1125,30 @@ export default function DiaryScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.captureBtn} onPress={async () => {
                     if (cameraRef.current) {
-                      const photo = await cameraRef.current.takePictureAsync();
-                      if (photo?.uri) {
-                        const dynamicResult = {
+                      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5, exif: true, skipProcessing: true });
+                      if (photo?.uri && photo.base64) {
+                        const placeholderResult = {
                           ...MOCK_SCANNED_RESULT,
                           image: photo.uri
                         };
-                        setScannedResult(dynamicResult);
+                        setScannedResult(placeholderResult);
                         setScannerStep('processing');
                         resultTransition.value = 0;
                         
-                        setTimeout(() => {
+                        try {
+                          const aiResult = await analyzeFoodWithAI(photo.base64);
+                          const dynamicResult = {
+                            ...aiResult,
+                            image: photo.uri
+                          };
+                          setScannedResult(dynamicResult);
                           resultTransition.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) });
-                        }, 2500);
+                        } catch (e) {
+                          console.log("Error analyzing food:", e);
+                          Alert.alert("Error", "Could not analyze the image. Please try again.");
+                          setIsScanning(false);
+                          setScannerStep('camera');
+                        }
                       }
                     }
                   }}>
@@ -995,8 +1275,14 @@ export default function DiaryScreen() {
                         const currentCarbs    = targetMeal ? (targetMeal.carbs   || 0) : 0;
                         const currentProtein  = targetMeal ? (targetMeal.protein || 0) : 0;
                         const currentFat      = targetMeal ? (targetMeal.fat     || 0) : 0;
-                        
-                        const newItems    = [...currentItems, scannedResult.title];
+                        const newItemObj = {
+                          title: scannedResult.title,
+                          calories: scannedResult.calories,
+                          carbs: scannedResult.macros?.carbs || 0,
+                          protein: scannedResult.macros?.protein || 0,
+                          fat: scannedResult.macros?.fat || 0,
+                        };
+                        const newItems    = [...currentItems, newItemObj];
                         const newCalories = currentCalories + scannedResult.calories;
                         const newCarbs    = currentCarbs    + (scannedResult.macros?.carbs   || 0);
                         const newProtein  = currentProtein  + (scannedResult.macros?.protein || 0);
@@ -1043,7 +1329,13 @@ export default function DiaryScreen() {
                             return {
                               ...m,
                               calories: m.calories + scannedResult.calories,
-                              items: [...m.items, scannedResult.title],
+                              items: [...m.items, {
+                                title: scannedResult.title,
+                                calories: scannedResult.calories,
+                                carbs: scannedResult.macros?.carbs || 0,
+                                protein: scannedResult.macros?.protein || 0,
+                                fat: scannedResult.macros?.fat || 0,
+                              }],
                               empty: false
                             };
                           }
