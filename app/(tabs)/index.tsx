@@ -934,9 +934,12 @@ export default function DiaryScreen() {
                 {meal.empty ? (
                   <Text style={[styles.mealEmptyText, { color: theme.mealEmptyText }]}>{t.noProducts}</Text>
                 ) : (
-                  meal.items.map((item: string, i: number) => (
-                    <Text key={i} style={[styles.mealItemText, { color: theme.textSecondary }]} numberOfLines={1}>• {item}</Text>
-                  ))
+                  meal.items.map((item: any, i: number) => {
+                    const title = typeof item === 'object' && item !== null ? item.title : item;
+                    return (
+                      <Text key={i} style={[styles.mealItemText, { color: theme.textSecondary }]} numberOfLines={1}>• {title}</Text>
+                    );
+                  })
                 )}
               </View>
 
