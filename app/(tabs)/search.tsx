@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import { Pedometer } from 'expo-sensors';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
 import {
+  Dimensions,
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
-  ScrollView,
-  Image,
-  Dimensions,
-  Alert,
+  TouchableOpacity,
   useColorScheme,
+  View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
-import { StatusBar } from 'expo-status-bar';
-import { MockStore } from '@/constants/store';
-import { Pedometer } from 'expo-sensors';
-import * as Location from 'expo-location';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '@/constants/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -138,6 +138,7 @@ const StepRing = ({ steps, goal, isDark, t }: any) => {
 
       {/* Center text */}
       <View style={{ alignItems: 'center' }}>
+        <Ionicons name="footsteps" size={32} color="#7EB93C" style={{ marginBottom: -4 }} />
         <Text style={[styles.ringSteps, { color: isDark ? '#FAFCF8' : '#1A1A1A' }]}>
           {steps.toLocaleString()}
         </Text>
@@ -151,52 +152,61 @@ const StepRing = ({ steps, goal, isDark, t }: any) => {
 };
 
 // ─── Route Map ────────────────────────────────────────────────────────────────
-const RouteMap = ({ isDark }: { isDark: boolean }) => {
-  const mapBg = isDark ? '#1A2310' : '#EAF3E0';
-  const roadColor = isDark ? '#2A3A20' : '#C8DDB8';
+type LatLng = { latitude: number; longitude: number };
+
+const RouteMap = ({ isDark, routePoints }: { isDark: boolean; routePoints: LatLng[] }) => {
   const routeColor = '#7EB93C';
+  const bgColor = isDark ? '#1A2310' : '#F5F9F0';
+  const textColor = isDark ? '#8a9e7a' : '#5a7a3a';
+
+  if (routePoints.length === 0) {
+    return (
+      <View style={[styles.mapContainer, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name="walk-outline" size={32} color={routeColor} />
+        <Text style={{ color: textColor, marginTop: 8, fontSize: 13 }}>
+          Start walking to see your route
+        </Text>
+      </View>
+    );
+  }
+
+  const first = routePoints[0];
+  const last = routePoints[routePoints.length - 1];
 
   return (
-    <View style={[styles.mapContainer, { backgroundColor: mapBg }]}>
-      {/* Road grid lines */}
-      {[0.2, 0.4, 0.6, 0.8].map((f) => (
-        <View key={`h${f}`} style={[styles.roadH, { top: `${f * 100}%`, backgroundColor: roadColor }]} />
-      ))}
-      {[0.15, 0.35, 0.55, 0.75, 0.9].map((f) => (
-        <View key={`v${f}`} style={[styles.roadV, { left: `${f * 100}%`, backgroundColor: roadColor }]} />
-      ))}
-
-      {/* Route dashed line */}
-      {Array.from({ length: 18 }).map((_, i) => {
-        const progress = i / 17;
-        const x = 0.12 + progress * 0.72;
-        const y = 0.82 - progress * 0.62 + Math.sin(progress * Math.PI) * 0.18;
-        return (
-          <View
-            key={`dot${i}`}
-            style={{
-              position: 'absolute',
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: '#FFFFFF',
-              left: `${x * 100}%`,
-              top: `${y * 100}%`,
-              opacity: 0.9,
-            }}
+    <View style={[styles.mapContainer, { overflow: 'hidden', backgroundColor: bgColor }]}>
+      <MapView
+        style={{ flex: 1, width: '100%', height: '100%' }}
+        initialRegion={{
+          latitude: last.latitude,
+          longitude: last.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        }}
+        userInterfaceStyle={isDark ? "dark" : "light"}
+        showsUserLocation={true}
+        showsMyLocationButton={true}
+      >
+        <Polyline
+          coordinates={routePoints}
+          strokeColor={routeColor}
+          strokeWidth={4}
+        />
+        {first && (
+          <Marker
+            coordinate={first}
+            title="Start"
+            pinColor="green"
           />
-        );
-      })}
-
-      {/* Start pin */}
-      <View style={[styles.mapPin, { left: '11%', bottom: '14%', backgroundColor: '#FFFFFF' }]}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: routeColor }} />
-      </View>
-
-      {/* End pin */}
-      <View style={[styles.mapPinEnd, { right: '14%', top: '12%' }]}>
-        <Ionicons name="location" size={24} color={routeColor} />
-      </View>
+        )}
+        {last && (
+          <Marker
+            coordinate={last}
+            title="Current"
+            pinColor="blue"
+          />
+        )}
+      </MapView>
     </View>
   );
 };
@@ -213,6 +223,7 @@ export default function PedometerScreen() {
   const [currentStepCount, setCurrentStepCount] = useState(0);
   const [caloriesEaten, setCaloriesEaten] = useState(0);
   const [debugMsg, setDebugMsg] = useState('Init...');
+  const [routePoints, setRoutePoints] = useState<{ latitude: number; longitude: number }[]>([]);
 
   const [selectedDayIdx, setSelectedDayIdx] = useState(2); // index 2 is Today
   const [activeMode, setActiveMode] = useState(0); // 0=Day, 1=Week, 2=Month
@@ -224,36 +235,57 @@ export default function PedometerScreen() {
     });
   }, []);
 
-  // 1. Ask permissions & initialize Pedometer
+  // 1. Ask permissions & initialize Pedometer (with GPS fallback for Android)
   useEffect(() => {
-    let subscription: Pedometer.Subscription | null = null;
+    let pedometerSub: Pedometer.Subscription | null = null;
+    let locationSub: Location.LocationSubscription | null = null;
+    let lastLocation: { lat: number; lon: number; timestamp?: number } | null = null;
+    let gpsStepAccumulator = 0;
+    const STEP_LENGTH_M = 0.762; // average step ~76.2 cm
     const todayStr = new Date().toISOString().split('T')[0];
+
+    // Haversine distance between two GPS coords in meters
+    const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371000;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
 
     const initPedometer = async () => {
       try {
-        // Permissions
+        // Request Location permission
         const locPerm = await Location.getForegroundPermissionsAsync();
         if (!locPerm.granted && locPerm.canAskAgain) {
           await Location.requestForegroundPermissionsAsync();
         }
-        
+
+        // Request Pedometer permission
         let pedPerm = await Pedometer.getPermissionsAsync();
-        let pStatus = pedPerm.granted ? 'OK' : 'Deny';
         if (!pedPerm.granted && pedPerm.canAskAgain) {
           pedPerm = await Pedometer.requestPermissionsAsync();
-          pStatus = pedPerm.granted ? 'OK(asked)' : 'Deny(asked)';
         }
+        const pedGranted = pedPerm.granted;
 
-        // Start Pedometer
+        // Check if native pedometer is available
         const isAvailable = await Pedometer.isAvailableAsync();
-        setDebugMsg(`Perm: ${pStatus} | Avail: ${isAvailable}`);
+        // Use native only if BOTH available AND permission granted
+        const useNative = isAvailable && pedGranted;
+        setDebugMsg(`Perm: ${pedGranted ? 'OK' : 'Deny'} | Avail: ${isAvailable} | Mode: ${useNative ? 'Native' : 'GPS'}`);
 
-        // Load History
+        // Load stored history
         const historyStr = await AsyncStorage.getItem('pedometer_history');
         const loadedHistory = historyStr ? JSON.parse(historyStr) : {};
         setStepHistory(loadedHistory);
 
-        if (isAvailable) {
+        if (useNative) {
+          // ── iOS path: native pedometer + GPS for route ──────────────────
           let baseSteps = loadedHistory[todayStr] || 0;
           try {
             const start = new Date();
@@ -261,17 +293,89 @@ export default function PedometerScreen() {
             const end = new Date();
             const past = await Pedometer.getStepCountAsync(start, end);
             if (past && past.steps !== undefined) {
-               baseSteps = past.steps;
+              baseSteps = past.steps;
             }
           } catch (e) {
             // fallback to stored history on error
           }
           setPastStepCount(baseSteps);
 
-          subscription = Pedometer.watchStepCount(result => {
+          pedometerSub = Pedometer.watchStepCount(result => {
             setCurrentStepCount(result.steps);
             setDebugMsg(prev => prev.split(' | Live:')[0] + ` | Live: ${result.steps}`);
           });
+
+          // Also track GPS route on iOS
+          const locGranted = await Location.getForegroundPermissionsAsync();
+          if (locGranted.granted) {
+            try {
+              const initPos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+              setRoutePoints([{ latitude: initPos.coords.latitude, longitude: initPos.coords.longitude }]);
+            } catch (_) { }
+
+            locationSub = await Location.watchPositionAsync(
+              { accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 3000 },
+              (loc) => {
+                const { latitude, longitude } = loc.coords;
+                setRoutePoints(prev => [...prev, { latitude, longitude }]);
+              }
+            );
+          }
+        } else {
+          // ── Android path: GPS-based step estimation ─────────────────────
+          const locGranted = await Location.getForegroundPermissionsAsync();
+          if (!locGranted.granted) {
+            setDebugMsg('GPS permission denied — steps unavailable');
+            return;
+          }
+
+          // Restore today's GPS steps from history
+          const savedGpsSteps = loadedHistory[todayStr] || 0;
+          gpsStepAccumulator = savedGpsSteps;
+          setPastStepCount(savedGpsSteps);
+          setDebugMsg(`GPS mode | Saved steps: ${savedGpsSteps}`);
+
+          // Get initial position to show on map immediately
+          try {
+            const initPos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            setRoutePoints([{ latitude: initPos.coords.latitude, longitude: initPos.coords.longitude }]);
+          } catch (_) { }
+
+          locationSub = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.High,
+              distanceInterval: 2, // update every 2 metres moved
+              timeInterval: 1500,
+            },
+            (location) => {
+              const { latitude: lat, longitude: lon } = location.coords;
+              // Android sometimes returns -1 for speed — use raw distance filtering instead
+              const rawSpeed = location.coords.speed ?? -1;
+              const timestamp = location.timestamp;
+
+              if (lastLocation) {
+                const dist = haversineDistance(lastLocation.lat, lastLocation.lon, lat, lon);
+
+                // Calculate speed from distance+time if GPS speed unreliable
+                const timeDeltaSec = lastLocation.timestamp
+                  ? (timestamp - lastLocation.timestamp) / 1000
+                  : 2;
+                const calcSpeed = timeDeltaSec > 0 ? dist / timeDeltaSec : 0;
+                const speed = rawSpeed >= 0 ? rawSpeed : calcSpeed;
+
+                // Only count if walking/running pace (0.4–8 m/s) and distance ≥ 1m
+                if (dist >= 1 && speed >= 0.4 && speed <= 8) {
+                  const newSteps = Math.round(dist / STEP_LENGTH_M);
+                  gpsStepAccumulator += newSteps;
+                  setCurrentStepCount(gpsStepAccumulator);
+                  setDebugMsg(`GPS | ${dist.toFixed(1)}m | ${speed.toFixed(1)}m/s | steps: ${gpsStepAccumulator}`);
+                }
+                // Always add point to route for drawing
+                setRoutePoints(prev => [...prev, { latitude: lat, longitude: lon }]);
+              }
+              lastLocation = { lat, lon, timestamp };
+            }
+          );
         }
       } catch (err: any) {
         setDebugMsg(`Err: ${err.message}`);
@@ -281,7 +385,8 @@ export default function PedometerScreen() {
     initPedometer();
 
     return () => {
-      subscription?.remove();
+      pedometerSub?.remove();
+      locationSub?.remove();
     };
   }, []);
 
@@ -313,10 +418,12 @@ export default function PedometerScreen() {
             .eq('meal_type', 'steps_history')
             .single();
 
+          const itemsJson = JSON.stringify(routePoints.length > 0 ? routePoints : ['steps_sync']);
+
           if (data) {
             await supabase
               .from('diary_entries')
-              .update({ calories: totalTodaySteps })
+              .update({ calories: totalTodaySteps, items: itemsJson })
               .eq('id', data.id);
           } else {
             await supabase
@@ -326,14 +433,14 @@ export default function PedometerScreen() {
                 date: todayStr,
                 meal_type: 'steps_history',
                 calories: totalTodaySteps,
-                items: JSON.stringify(['steps_sync'])
+                items: itemsJson
               });
           }
         }, 5000); // 5 sec debounce
         return () => clearTimeout(syncTimeout);
       }
     }
-  }, [totalTodaySteps, todayStr, userId]);
+  }, [totalTodaySteps, todayStr, userId, routePoints]);
 
   // 2b. Fetch historical steps from Supabase backend
   useEffect(() => {
@@ -341,11 +448,26 @@ export default function PedometerScreen() {
     const fetchStepHistory = async () => {
       const { data, error } = await supabase
         .from('diary_entries')
-        .select('date, calories')
+        .select('date, calories, items')
         .eq('user_id', userId)
         .eq('meal_type', 'steps_history');
 
       if (data && !error) {
+        // Load today's route points
+        const todayData = data.find((row: any) => row.date === todayStr);
+        if (todayData && todayData.items) {
+          try {
+            const pts = JSON.parse(todayData.items);
+            if (Array.isArray(pts) && pts.length > 0 && pts[0].latitude) {
+              setRoutePoints(prev => {
+                // To avoid duplicate merging, check if we already have these
+                if (prev.length > 0 && prev[0].latitude === pts[0].latitude) return prev;
+                return [...pts, ...prev];
+              });
+            }
+          } catch (e) { }
+        }
+
         setStepHistory(prev => {
           const newHistory = { ...prev };
           let changed = false;
@@ -364,7 +486,7 @@ export default function PedometerScreen() {
       }
     };
     fetchStepHistory();
-  }, [userId]);
+  }, [userId, todayStr]);
 
   // 3. Fetch calories eaten from Supabase
   useEffect(() => {
@@ -383,10 +505,10 @@ export default function PedometerScreen() {
         .select('calories')
         .eq('user_id', userId)
         .eq('date', todayStr);
-        
+
       if (data && !error) {
-         const total = data.reduce((s: number, m: any) => s + (m.calories || 0), 0);
-         setCaloriesEaten(total);
+        const total = data.reduce((s: number, m: any) => s + (m.calories || 0), 0);
+        setCaloriesEaten(total);
       }
     };
     fetchEaten();
@@ -415,12 +537,12 @@ export default function PedometerScreen() {
     const daysToSum = period === 1 ? 7 : 30;
     let sum = 0;
     const today = new Date();
-    for(let i=0; i<daysToSum; i++) {
-       const d = new Date(today);
-       d.setDate(d.getDate() - i);
-       const dStr = d.toISOString().split('T')[0];
-       if (i === 0) sum += totalTodaySteps;
-       else sum += (stepHistory[dStr] || 0);
+    for (let i = 0; i < daysToSum; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dStr = d.toISOString().split('T')[0];
+      if (i === 0) sum += totalTodaySteps;
+      else sum += (stepHistory[dStr] || 0);
     }
     return sum;
   };
@@ -429,9 +551,9 @@ export default function PedometerScreen() {
   const selectedDateObj = new Date();
   selectedDateObj.setDate(selectedDateObj.getDate() + (selectedDayIdx - 2));
   const selectedDateString = selectedDateObj.toISOString().split('T')[0];
-  
+
   const isSelectedToday = selectedDayIdx === 2;
-  
+
   let displaySteps = 0;
   let displayGoal = 10000;
 
@@ -473,8 +595,6 @@ export default function PedometerScreen() {
               </Text>
             </View>
           </View>
-          {/* DEBUG INFO */}
-          <Text style={{fontSize: 10, color: 'red', marginTop: 4}}>{debugMsg}</Text>
         </Animated.View>
 
         {/* ── Week Day Selector ── */}
@@ -549,7 +669,7 @@ export default function PedometerScreen() {
           entering={FadeInDown.duration(400).delay(240)}
           style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, overflow: 'hidden', padding: 0 }]}
         >
-          <RouteMap isDark={isDark} />
+          <RouteMap isDark={isDark} routePoints={routePoints} />
         </Animated.View>
 
         {/* ── Stats Grid (2×2) ── */}
