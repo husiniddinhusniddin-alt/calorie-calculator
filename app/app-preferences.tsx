@@ -5,14 +5,15 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, Snackbar, Portal } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
 
 export default function AppPreferencesScreen() {
   const router = useRouter();
@@ -37,8 +38,21 @@ export default function AppPreferencesScreen() {
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     MockStore.update({ appTheme, language });
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({
+          app_theme: appTheme,
+          language
+        }).eq('id', user.id);
+      }
+    } catch (err) {
+      console.warn('Failed to update app preferences in DB:', err);
+    }
+
     setSnackbarVisible(true);
     setTimeout(() => {
       router.back();

@@ -4,11 +4,12 @@ import {
   Text,
   View,
   ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
+  Image,
   Dimensions,
+  Alert,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   FadeInDown,

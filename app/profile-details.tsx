@@ -5,12 +5,12 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Image,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, TextInput, Snackbar, Portal } from 'react-native-paper';
@@ -43,8 +43,9 @@ export default function ProfileDetailsScreen() {
   const [name, setName] = useState(MockStore.name || 'User');
   const [email, setEmail] = useState(MockStore.email || '');
   const [phone, setPhone] = useState('');
-  const [height, setHeight] = useState('180');
+  const [height, setHeight] = useState(MockStore.height ? MockStore.height.toString() : '180');
   const [weight, setWeight] = useState(MockStore.currentWeight.toString());
+  const [age, setAge] = useState(MockStore.age ? MockStore.age.toString() : '');
   const [dob, setDob] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
 
@@ -65,8 +66,9 @@ export default function ProfileDetailsScreen() {
         setName(profile.name || MockStore.name);
         setEmail(profile.email || MockStore.email);
         setPhone(profile.phone || '');
-        setHeight((profile.height || 180).toString());
+        setHeight((profile.height || MockStore.height || 180).toString());
         setWeight((profile.current_weight || MockStore.currentWeight).toString());
+        setAge((profile.age || MockStore.age || '').toString());
         setDob(profile.dob || '');
         setProfileImage(profile.profile_image || MockStore.profileImage);
       }
@@ -88,6 +90,7 @@ export default function ProfileDetailsScreen() {
 
     const parsedWeight = parseFloat(weight) || MockStore.currentWeight;
     const parsedHeight = parseFloat(height) || 180;
+    const parsedAge = parseInt(age, 10) || null;
 
     // Save to MockStore
     MockStore.update({
@@ -95,21 +98,31 @@ export default function ProfileDetailsScreen() {
       email: email.trim(),
       profileImage: profileImage,
       currentWeight: parsedWeight,
+      height: parsedHeight,
+      age: parsedAge,
     });
 
     // Save to Supabase profiles table
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase.from('profiles').update({
+        const { error } = await supabase.from('profiles').update({
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim(),
           height: parsedHeight,
+          age: parsedAge,
           current_weight: parsedWeight,
           dob: dob.trim() || null,
           profile_image: profileImage,
         }).eq('id', user.id);
+        
+        if (error) {
+          console.warn('Update error:', error);
+          setSnackbarMsg('Failed to update: ' + error.message);
+          setSnackbarVisible(true);
+          return;
+        }
       }
     } catch (err) {
       console.warn('Failed to save profile to DB:', err);
@@ -262,6 +275,22 @@ export default function ProfileDetailsScreen() {
                   />
                 </View>
                 <View style={{ flex: 1, marginLeft: 8 }}>
+                  <TextInput
+                    mode="outlined"
+                    label="Age"
+                    value={age}
+                    onChangeText={setAge}
+                    keyboardType="numeric"
+                    activeOutlineColor="#7EB93C"
+                    outlineColor={theme.inputOutline}
+                    textColor={theme.inputText}
+                    theme={{ colors: { background: theme.inputBackground } }}
+                    style={styles.input}
+                  />
+                </View>
+              </View>
+              <View style={[styles.row, { marginTop: 12 }]}>
+                <View style={{ flex: 1, marginRight: 8 }}>
                   <TextInput
                     mode="outlined"
                     label="Weight (kg)"

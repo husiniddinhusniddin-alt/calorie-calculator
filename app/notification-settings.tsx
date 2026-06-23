@@ -5,25 +5,48 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Switch,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, Snackbar, Portal } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
+import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
 
 export default function NotificationSettingsScreen() {
   const router = useRouter();
-  const [dailyReminder, setDailyReminder] = useState(true);
-  const [weeklyReport, setWeeklyReport] = useState(true);
-  const [weightLogAlert, setWeightLogAlert] = useState(false);
-  const [promoEmail, setPromoEmail] = useState(false);
-  const [soundEffects, setSoundEffects] = useState(true);
+  const [dailyReminder, setDailyReminder] = useState(MockStore.notifications.dailyReminder);
+  const [weeklyReport, setWeeklyReport] = useState(MockStore.notifications.weeklyReport);
+  const [weightLogAlert, setWeightLogAlert] = useState(MockStore.notifications.weightLogAlert);
+  const [promoEmail, setPromoEmail] = useState(MockStore.notifications.promoEmail);
+  const [soundEffects, setSoundEffects] = useState(MockStore.notifications.soundEffects);
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const notifications = {
+      dailyReminder,
+      weeklyReport,
+      weightLogAlert,
+      promoEmail,
+      soundEffects,
+    };
+    
+    MockStore.update({ notifications });
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({
+          notifications
+        }).eq('id', user.id);
+      }
+    } catch (err) {
+      console.warn('Failed to update notifications in DB:', err);
+    }
+
     setSnackbarVisible(true);
     setTimeout(() => {
       router.back();
