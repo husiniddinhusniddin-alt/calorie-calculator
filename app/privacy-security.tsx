@@ -5,13 +5,14 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, TextInput, Snackbar, Portal } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '@/constants/supabase';
 
 export default function PrivacySecurityScreen() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function PrivacySecurityScreen() {
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
 
-  const handleUpdatePassword = () => {
+  const handleUpdatePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       setSnackbarMsg('Please fill in all password fields.');
       setSnackbarVisible(true);
@@ -33,6 +34,18 @@ export default function PrivacySecurityScreen() {
       setSnackbarVisible(true);
       return;
     }
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        setSnackbarMsg('Failed to update: ' + error.message);
+        setSnackbarVisible(true);
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to update password:', err);
+    }
+
     setSnackbarMsg('Password updated successfully! 🔒');
     setSnackbarVisible(true);
     setCurrentPassword('');
@@ -49,12 +62,15 @@ export default function PrivacySecurityScreen() {
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => {
-            setSnackbarMsg('Account deleted. Redirecting...');
-            setSnackbarVisible(true);
-            setTimeout(() => {
+          onPress: async () => {
+            // Note: In Supabase, deleting an auth user directly from the client requires either a dedicated Postgres function (RPC) or an Edge Function due to security restrictions.
+            // For now, we will simply sign them out as a placeholder until the backend function is created.
+            try {
+              await supabase.auth.signOut();
               router.replace('/(auth)/login');
-            }, 1500);
+            } catch (err) {
+              console.warn('Failed to sign out:', err);
+            }
           }
         }
       ]

@@ -88,60 +88,11 @@ export default function RegisterScreen() {
     }
 
     if (isValid) {
-      setLoading(true);
       const fullPhone = selectedCountry.code + cleanPhone;
-
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password: password.trim(),
-        });
-
-        if (error) {
-          Alert.alert('Xatolik', error.message);
-          setLoading(false);
-          return;
-        }
-
-        if (data.session) {
-          // Create user profile in profiles table
-          const { error: profileError } = await supabase.from('profiles').insert({
-            id: data.user.id,
-            email: email.trim(),
-            phone: fullPhone,
-            name: email.split('@')[0], // Use email prefix as a default display name
-            current_weight: 85,
-            starting_weight: 85,
-            target_weight: 82,
-            daily_calorie_goal: 1900,
-            weekly_weight_goal: 0.5,
-            target_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-          });
-
-          if (profileError) {
-            console.warn('Profile creation failed:', profileError.message);
-          }
-
-          // Sync initial state to MockStore
-          MockStore.update({
-            profileImage: null,
-            targetWeight: 82,
-            currentWeight: 85,
-            startingWeight: 85,
-            dailyCalorieGoal: 1900,
-            weeklyWeightGoal: 0.5,
-          });
-
-          router.replace('/(tabs)');
-        } else if (data.user) {
-          Alert.alert('Muvaffaqiyatli', 'Ro\'yxatdan o\'tish muvaffaqiyatli! Iltimos, emailingizni tasdiqlang.');
-          router.replace('/(auth)/login');
-        }
-      } catch (err: any) {
-        Alert.alert('Xatolik', err.message || 'Kutilmagan xatolik yuz berdi');
-      } finally {
-        setLoading(false);
-      }
+      router.push({
+        pathname: '/(auth)/register-details',
+        params: { email: email.trim(), password: password.trim(), phone: fullPhone }
+      });
     }
   };
 

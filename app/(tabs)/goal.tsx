@@ -5,12 +5,12 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
@@ -41,7 +41,7 @@ const translations = {
     remainingDescLoss: '{diff} kg remaining to reach your goal.',
     remainingDescGain: '{diff} kg to gain to reach your goal.',
     atTargetWeight: 'You are exactly at your target weight!',
-    dailyCalorieTarget: 'Daily Calorie Target',
+    dailyCalorieTarget: 'Daily Calorie Target ',
     calorieTargetDesc: 'Customize your daily target or use our suggestion based on your target weight.',
     weeklyChangeRate: 'Weekly Change Rate',
     kgWk: '{rate} kg/wk',

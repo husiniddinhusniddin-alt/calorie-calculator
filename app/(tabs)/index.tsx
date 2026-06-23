@@ -9,9 +9,9 @@ import {
   TextInput,
   Alert,
   Dimensions,
-  SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -161,10 +161,10 @@ const DIARY_MEALS = [
   },
 ];
 
-const DEFAULT_DAILY_GOAL = 1900;
-const DEFAULT_CARBS_GOAL  = 238; // (1900 * 0.5) / 4
-const DEFAULT_PROTEIN_GOAL = 143; // (1900 * 0.3) / 4
-const DEFAULT_FATS_GOAL   = 42; // (1900 * 0.2) / 9
+const DEFAULT_DAILY_GOAL = 2000;
+const DEFAULT_CARBS_GOAL  = 250; // (2000 * 0.5) / 4
+const DEFAULT_PROTEIN_GOAL = 150; // (2000 * 0.3) / 4
+const DEFAULT_FATS_GOAL   = 44; // (2000 * 0.2) / 9
 
 const TRENDS_DATA = {
   day: {
@@ -338,7 +338,7 @@ const analyzeFoodWithAI = async (base64Image: string) => {
         {
           role: "user",
           content: [
-            { type: "text", text: "Analyze this food image. Provide exact estimated calories, carbs, protein, and fat. Return ONLY a JSON object in this format (no markdown formatting): { \"title\": \"Name of dish\", \"subtitle\": \"Short desc\", \"serving\": 1, \"calories\": 400, \"macros\": { \"carbs\": 20, \"protein\": 10, \"fat\": 15 }, \"ingredients\": [ { \"name\": \"Ingredient\", \"weight\": \"100g\", \"calories\": 200, \"carbs\": 10, \"protein\": 5, \"fat\": 10 } ] } If there are multiple ingredients, list them. Ensure all macros numbers are integers." },
+            { type: "text", text: "Analyze this food image. Provide exact estimated calories, carbs, protein, and fat. Return ONLY a JSON object in this format (no markdown formatting): { \"title\": \"Name of dish\", \"subtitle\": \"Short desc\", \"serving\": 1, \"calories\": 400, \"macros\": { \"carbs\": 20, \"protein\": 10, \"fat\": 15 }, \"ingredients\": [ { \"name\": \"Ingredient\", \"weight\": \"100g\", \"calories\": 200, \"carbs\": 10, \"protein\": 5, \"fat\": 10 } ] } If there are multiple ingredients, list them. Ensure all macros numbers are integers. IMPORTANT: If there is no food in the image, or the image is of too poor quality to identify any food, return ONLY this JSON object: { \"error\": \"not_food\" }" },
             {
               type: "image_url",
               image_url: {
@@ -424,26 +424,37 @@ export default function DiaryScreen() {
   const [totalProtein, setTotalProtein] = useState(0);
   const [totalFat,     setTotalFat]     = useState(0);
 
-  // Fetch macro goals AND calorie goal from profiles when userId is known
+  // Fetch profile data (name, calorie goal) from profiles when userId is known
   useEffect(() => {
     if (!userId) return;
-    const fetchGoals = async () => {
+    const fetchProfileData = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('daily_calorie_goal')
+        .select('name, daily_calorie_goal')
         .eq('id', userId)
         .single();
+        
       if (data) {
+        let storeUpdates: any = {};
+        
+        if (data.name) {
+          storeUpdates.name = data.name;
+        }
+        
         if (data.daily_calorie_goal) {
           const goal = data.daily_calorie_goal;
-          MockStore.update({ dailyCalorieGoal: goal });
+          storeUpdates.dailyCalorieGoal = goal;
           setCarbsGoal(Math.round((goal * 0.50) / 4));
           setProteinGoal(Math.round((goal * 0.30) / 4));
           setFatGoal(Math.round((goal * 0.20) / 9));
         }
+
+        if (Object.keys(storeUpdates).length > 0) {
+          MockStore.update(storeUpdates);
+        }
       }
     };
-    fetchGoals();
+    fetchProfileData();
   }, [userId]);
   const [isEditModalVisible, setEditModalVisible] = useState(false);
   const [isCalendarVisible, setCalendarVisible] = useState(false);
@@ -500,6 +511,7 @@ export default function DiaryScreen() {
   const formattedDayName = dateObj.toLocaleDateString(locale, { weekday: 'long' });
   const formattedDate = dateObj.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 
+  const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('day');
   const [isFetching, setIsFetching] = useState(true);
 
   useEffect(() => {
@@ -519,12 +531,10 @@ export default function DiaryScreen() {
   const [tempFat, setTempFat] = useState(fatGoal.toString());
   const [selectedMealType, setSelectedMealType] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [scannerStep, setScannerStep] = useState<'camera' | 'processing'>('camera');
+  const [scannerStep, setScannerStep] = useState<'camera' | 'processing' | 'error'>('camera');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scannedResult, setScannedResult] = useState<any>(null);
   const cameraRef = useRef<CameraView>(null);
-
-  const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('day');
 
   // Real trend chart data from Supabase
   const [trendChartData, setTrendChartData] = useState<{ label: string; value: number }[]>([]);
@@ -1140,12 +1150,16 @@ export default function DiaryScreen() {
                         
                         try {
                           const aiResult = await analyzeFoodWithAI(photo.base64);
-                          const dynamicResult = {
-                            ...aiResult,
-                            image: photo.uri
-                          };
-                          setScannedResult(dynamicResult);
-                          resultTransition.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) });
+                          if (aiResult.error === 'not_food') {
+                            setScannerStep('error');
+                          } else {
+                            const dynamicResult = {
+                              ...aiResult,
+                              image: photo.uri
+                            };
+                            setScannedResult(dynamicResult);
+                            resultTransition.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) });
+                          }
                         } catch (e) {
                           console.log("Error analyzing food:", e);
                           Alert.alert("Error", "Could not analyze the image. Please try again.");
@@ -1357,6 +1371,34 @@ export default function DiaryScreen() {
                   </TouchableOpacity>
                 </View>
               </Animated.View>
+            </View>
+          )}
+
+          {scannerStep === 'error' && (
+            <View style={[styles.resultContainer, { justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#111' }]}>
+              <Ionicons name="warning-outline" size={80} color="#FFD700" style={{ marginBottom: 24 }} />
+              <Text style={{ fontSize: 24, fontWeight: '700', color: '#FFF', textAlign: 'center', marginBottom: 12 }}>We couldn't identify any food.</Text>
+              <Text style={{ fontSize: 16, color: '#AAA', textAlign: 'center', marginBottom: 40 }}>Please make sure the dish is clearly visible and the photo is of good quality.</Text>
+              <View style={{ width: '100%', gap: 16, paddingHorizontal: 20 }}>
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#7EB93C', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }} 
+                  onPress={() => {
+                    setScannedResult(null);
+                    setScannerStep('camera');
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '600' }}>Try Again</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#333', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }} 
+                  onPress={() => {
+                    setIsScanning(false);
+                    setScannerStep('camera');
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '600' }}>Back to Home</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
