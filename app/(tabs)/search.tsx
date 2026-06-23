@@ -8,10 +8,10 @@ import {
   ScrollView,
   Image,
   Dimensions,
-  SafeAreaView,
   Alert,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInUp, SlideInRight } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';

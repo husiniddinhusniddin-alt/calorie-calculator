@@ -5,10 +5,10 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Image,
   useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
@@ -71,9 +71,36 @@ export default function ProfileScreen() {
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
   const [targetWeight, setTargetWeight] = useState<number>(MockStore.targetWeight);
   const [currentWeight, setCurrentWeight] = useState<number>(MockStore.currentWeight);
+  const [age, setAge] = useState<number | null>(MockStore.age);
+  const [height, setHeight] = useState<number | null>(MockStore.height);
+  const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
+  const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
 
   // Subscribe to MockStore updates
   useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+        
+      if (data) {
+        MockStore.update({
+          name: data.name || MockStore.name,
+          email: data.email || MockStore.email,
+          profileImage: data.profile_image || MockStore.profileImage,
+          targetWeight: data.target_weight || MockStore.targetWeight,
+          currentWeight: data.current_weight || MockStore.currentWeight,
+          age: data.age || MockStore.age,
+          height: data.height || MockStore.height,
+        });
+      }
+    };
+    fetchProfile();
+
     return MockStore.subscribe(() => {
       setProfileImage(MockStore.profileImage);
       setTargetWeight(MockStore.targetWeight);
@@ -82,6 +109,10 @@ export default function ProfileScreen() {
       setLanguage(MockStore.language);
       setName(MockStore.name);
       setEmail(MockStore.email);
+      setAge(MockStore.age);
+      setHeight(MockStore.height);
+      setCalorieStreak(MockStore.calorieStreak);
+      setWaterStreak(MockStore.waterStreak);
     });
   }, []);
 
@@ -98,6 +129,8 @@ export default function ProfileScreen() {
         weeklyWeightGoal: 0.5,
         name: 'Alex Green',
         email: 'alex.green@health.com',
+        age: null,
+        height: null,
       });
       router.replace('/(auth)/login');
     } catch (err) {
@@ -140,7 +173,7 @@ export default function ProfileScreen() {
   };
 
   // Goal calculations
-  const weightDiff = currentWeight - targetWeight;
+  const weightDiff = MockStore.startingWeight - currentWeight;
   const isLoss = weightDiff >= 0;
   const absWeightDiff = Math.abs(weightDiff);
 
@@ -199,12 +232,12 @@ export default function ProfileScreen() {
             </View>
             <View style={[styles.statDividerVertical, { backgroundColor: theme.cardBorder }]} />
             <View style={styles.statBox}>
-              <Text style={[styles.statVal, { color: theme.textPrimary }]}>182 cm</Text>
+              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{height ? `${height} cm` : '--'}</Text>
               <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.height}</Text>
             </View>
             <View style={[styles.statDividerVertical, { backgroundColor: theme.cardBorder }]} />
             <View style={styles.statBox}>
-              <Text style={[styles.statVal, { color: theme.textPrimary }]}>28</Text>
+              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{age ? age : '--'}</Text>
               <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.age}</Text>
             </View>
           </View>
@@ -249,7 +282,7 @@ export default function ProfileScreen() {
               <View style={[styles.streakIconBg, { backgroundColor: '#FFF7E6' }]}>
                 <Ionicons name="flame" size={24} color="#FFA940" />
               </View>
-              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>5 {t.days}</Text>
+              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>{calorieStreak} {t.days}</Text>
               <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.calorieTarget}</Text>
             </View>
 
@@ -257,7 +290,7 @@ export default function ProfileScreen() {
               <View style={[styles.streakIconBg, { backgroundColor: '#F0FAE4' }]}>
                 <Ionicons name="water" size={24} color="#7EB93C" />
               </View>
-              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>12 {t.days}</Text>
+              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>{waterStreak} {t.days}</Text>
               <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.waterIntake}</Text>
             </View>
 
@@ -265,7 +298,7 @@ export default function ProfileScreen() {
               <View style={[styles.streakIconBg, { backgroundColor: '#E6F7FF' }]}>
                 <Ionicons name="trending-down" size={24} color="#1890FF" />
               </View>
-              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>-{absWeightDiff.toFixed(1)} kg</Text>
+              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>{isLoss ? '-' : '+'}{absWeightDiff.toFixed(1)} kg</Text>
               <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.weightLoss}</Text>
             </View>
           </View>
