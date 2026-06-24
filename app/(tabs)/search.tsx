@@ -14,7 +14,8 @@ import {
   Text,
   TouchableOpacity,
   useColorScheme,
-  View
+  View,
+  Modal
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import Animated, {
@@ -154,19 +155,19 @@ const StepRing = ({ steps, goal, isDark, t }: any) => {
 // ─── Route Map ────────────────────────────────────────────────────────────────
 type LatLng = { latitude: number; longitude: number };
 
-const RouteMap = ({ isDark, routePoints }: { isDark: boolean; routePoints: LatLng[] }) => {
+const RouteMap = ({ isDark, routePoints, onPress }: { isDark: boolean; routePoints: LatLng[], onPress?: () => void }) => {
   const routeColor = '#7EB93C';
   const bgColor = isDark ? '#1A2310' : '#F5F9F0';
   const textColor = isDark ? '#8a9e7a' : '#5a7a3a';
 
   if (routePoints.length === 0) {
     return (
-      <View style={[styles.mapContainer, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.mapContainer, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
         <Ionicons name="walk-outline" size={32} color={routeColor} />
         <Text style={{ color: textColor, marginTop: 8, fontSize: 13 }}>
           Start walking to see your route
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -174,40 +175,46 @@ const RouteMap = ({ isDark, routePoints }: { isDark: boolean; routePoints: LatLn
   const last = routePoints[routePoints.length - 1];
 
   return (
-    <View style={[styles.mapContainer, { overflow: 'hidden', backgroundColor: bgColor }]}>
-      <MapView
-        style={{ flex: 1, width: '100%', height: '100%' }}
-        initialRegion={{
-          latitude: last.latitude,
-          longitude: last.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        }}
-        userInterfaceStyle={isDark ? "dark" : "light"}
-        showsUserLocation={true}
-        showsMyLocationButton={true}
-      >
-        <Polyline
-          coordinates={routePoints}
-          strokeColor={routeColor}
-          strokeWidth={4}
-        />
-        {first && (
-          <Marker
-            coordinate={first}
-            title="Start"
-            pinColor="green"
+    <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.mapContainer, { overflow: 'hidden', backgroundColor: bgColor }]}>
+      <View pointerEvents="none" style={{ flex: 1 }}>
+        <MapView
+          style={{ flex: 1, width: '100%', height: '100%' }}
+          initialRegion={{
+            latitude: last.latitude,
+            longitude: last.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          }}
+          userInterfaceStyle={isDark ? "dark" : "light"}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          pitchEnabled={false}
+          rotateEnabled={false}
+        >
+          <Polyline
+            coordinates={routePoints}
+            strokeColor={routeColor}
+            strokeWidth={4}
           />
-        )}
-        {last && (
-          <Marker
-            coordinate={last}
-            title="Current"
-            pinColor="blue"
-          />
-        )}
-      </MapView>
-    </View>
+          {first && (
+            <Marker
+              coordinate={first}
+              title="Start"
+              pinColor="green"
+            />
+          )}
+          {last && (
+            <Marker
+              coordinate={last}
+              title="Current"
+              pinColor="blue"
+            />
+          )}
+        </MapView>
+      </View>
+    </TouchableOpacity>
   );
 };
 
@@ -227,6 +234,7 @@ export default function PedometerScreen() {
 
   const [selectedDayIdx, setSelectedDayIdx] = useState(2); // index 2 is Today
   const [activeMode, setActiveMode] = useState(0); // 0=Day, 1=Week, 2=Month
+  const [isMapFullScreen, setIsMapFullScreen] = useState(false);
 
   useEffect(() => {
     return MockStore.subscribe(() => {
@@ -504,7 +512,8 @@ export default function PedometerScreen() {
         .from('diary_entries')
         .select('calories')
         .eq('user_id', userId)
-        .eq('date', todayStr);
+        .eq('date', todayStr)
+        .neq('meal_type', 'steps_history');
 
       if (data && !error) {
         const total = data.reduce((s: number, m: any) => s + (m.calories || 0), 0);
@@ -628,7 +637,7 @@ export default function PedometerScreen() {
             <StepRing steps={displaySteps} goal={displayGoal} isDark={isDark} t={t} />
           </View>
 
-          {/* ── 3 stats below ring ── */}
+          {/* ── 2 stats below ring ── */}
           <View style={[styles.statsRow, { borderTopColor: theme.cardBorder }]}>
             <View style={styles.statItem}>
               <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.distance}</Text>
@@ -636,13 +645,8 @@ export default function PedometerScreen() {
             </View>
             <View style={[styles.statDivider, { backgroundColor: theme.cardBorder }]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.time}</Text>
-              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{activeTimeStr}</Text>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: theme.cardBorder }]} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.heart}</Text>
-              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{heartRate} <Text style={styles.statUnit}>{t.bpm}</Text></Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.caloriesBurned}</Text>
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{activeCaloriesBurned} <Text style={styles.statUnit}>{t.kcal}</Text></Text>
             </View>
           </View>
         </Animated.View>
@@ -669,7 +673,7 @@ export default function PedometerScreen() {
           entering={FadeInDown.duration(400).delay(240)}
           style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, overflow: 'hidden', padding: 0 }]}
         >
-          <RouteMap isDark={isDark} routePoints={routePoints} />
+          <RouteMap isDark={isDark} routePoints={routePoints} onPress={() => setIsMapFullScreen(true)} />
         </Animated.View>
 
         {/* ── Stats Grid (2×2) ── */}
@@ -731,6 +735,58 @@ export default function PedometerScreen() {
 
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      {/* ── Full Screen Interactive Map Modal ── */}
+      <Modal visible={isMapFullScreen} animationType="slide" transparent={false}>
+        <View style={{ flex: 1, backgroundColor: theme.background }}>
+          {routePoints.length > 0 ? (
+            <MapView
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: routePoints[routePoints.length - 1].latitude,
+                longitude: routePoints[routePoints.length - 1].longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              }}
+              userInterfaceStyle={isDark ? "dark" : "light"}
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+            >
+              <Polyline
+                coordinates={routePoints}
+                strokeColor="#7EB93C"
+                strokeWidth={4}
+              />
+              <Marker coordinate={routePoints[0]} title="Start" pinColor="green" />
+              <Marker coordinate={routePoints[routePoints.length - 1]} title="Current" pinColor="blue" />
+            </MapView>
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: theme.textMuted }}>No route data available</Text>
+            </View>
+          )}
+          <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
+            <View style={{ padding: 16, alignItems: 'flex-end' }}>
+              <TouchableOpacity 
+                onPress={() => setIsMapFullScreen(false)} 
+                style={{ 
+                  backgroundColor: theme.cardBackground, 
+                  borderRadius: 20, 
+                  padding: 8, 
+                  shadowColor: '#000', 
+                  shadowOffset: { width: 0, height: 2 }, 
+                  shadowOpacity: 0.25, 
+                  shadowRadius: 3.84, 
+                  elevation: 5 
+                }}
+              >
+                <Ionicons name="close" size={24} color={theme.textPrimary} />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
