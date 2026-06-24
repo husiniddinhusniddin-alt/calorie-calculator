@@ -1138,7 +1138,7 @@ export default function DiaryScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.captureBtn} onPress={async () => {
                     if (cameraRef.current) {
-                      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5, exif: true, skipProcessing: true });
+                      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5, exif: true });
                       if (photo?.uri && photo.base64) {
                         const placeholderResult = {
                           ...MOCK_SCANNED_RESULT,
