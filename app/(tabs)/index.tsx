@@ -11,7 +11,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -363,6 +363,7 @@ const analyzeFoodWithAI = async (base64Image: string) => {
 
 export default function DiaryScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
@@ -729,42 +730,42 @@ export default function DiaryScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: Math.max(10, insets.top - 35) }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Header Top Row */}
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-          <View style={styles.headerTopRow}>
-            <TouchableOpacity 
-              style={[styles.datePill, { backgroundColor: theme.pillBackground }]}
-              onPress={() => setCalendarVisible(true)}
-            >
-              <View style={[styles.dateIconContainer, { borderColor: theme.macroRingBg }]}>
-                <Ionicons name="calendar-outline" size={18} color={theme.textPrimary} />
-              </View>
-              <View>
-                <Text style={[styles.dateDay, { color: theme.textPrimary, textTransform: 'capitalize' }]}>{formattedDayName}</Text>
-                <Text style={[styles.dateFull, { color: theme.textMuted }]}>{formattedDate}</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              activeOpacity={0.7}
-              onPress={() => router.push('/profile')}
-            >
-              <View style={[styles.avatarContainer, { backgroundColor: theme.pillBackground, justifyContent: 'center', alignItems: 'center' }]}>
-                {profileImage ? (
-                  <Image source={{ uri: profileImage }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                ) : (
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#7EB93C' }}>
-                    {userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-                  </Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
+      {/* Header Top Row - Fixed */}
+      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            style={[styles.datePill, { backgroundColor: theme.pillBackground }]}
+            onPress={() => setCalendarVisible(true)}
+          >
+            <View style={[styles.dateIconContainer, { borderColor: theme.macroRingBg }]}>
+              <Ionicons name="calendar-outline" size={18} color={theme.textPrimary} />
+            </View>
+            <View>
+              <Text style={[styles.dateDay, { color: theme.textPrimary, textTransform: 'capitalize' }]}>{formattedDayName}</Text>
+              <Text style={[styles.dateFull, { color: theme.textMuted }]}>{formattedDate}</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            activeOpacity={0.7}
+            onPress={() => router.push('/profile')}
+          >
+            <View style={[styles.avatarContainer, { backgroundColor: theme.pillBackground, justifyContent: 'center', alignItems: 'center' }]}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+              ) : (
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#7EB93C' }}>
+                  {userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {isFetching ? (
           <View style={{ marginTop: 0 }}>
             {/* Target Card Skeleton */}
@@ -1404,7 +1405,7 @@ export default function DiaryScreen() {
         </View>
       </Modal>
 
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1415,17 +1416,19 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: 16,
-    paddingTop: 15,
+    paddingTop: 8,
     paddingBottom: 80,
   },
   header: {
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    marginBottom: 8,
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 8,
   },
   datePill: {
     flexDirection: 'row',

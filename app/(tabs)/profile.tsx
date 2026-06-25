@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { MockStore } from '@/constants/store';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
 import {
+  Image,
+  Modal,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
-  ScrollView,
   TouchableOpacity,
-  Image,
   useColorScheme,
-  Modal,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import { MockStore } from '@/constants/store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const translations = {
   en: {
@@ -45,7 +45,7 @@ import { supabase } from '@/constants/supabase';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  
+
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
   const [name, setName] = useState<string>(MockStore.name);
@@ -77,6 +77,7 @@ export default function ProfileScreen() {
   const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Subscribe to MockStore updates
   useEffect(() => {
@@ -88,7 +89,7 @@ export default function ProfileScreen() {
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
-        
+
       if (data) {
         MockStore.update({
           name: data.name || MockStore.name,
@@ -164,7 +165,7 @@ export default function ProfileScreen() {
     if (!result.canceled && result.assets && result.assets[0].uri) {
       const selectedUri = result.assets[0].uri;
       MockStore.update({ profileImage: selectedUri });
-      
+
       // Update image url in Supabase profiles table
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -185,23 +186,23 @@ export default function ProfileScreen() {
   const absWeightDiff = Math.abs(weightDiff);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        
+
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <Text style={[styles.pageTitle, { color: theme.textBrand }]}>{t.myProfile}</Text>
         </Animated.View>
 
         {/* Profile Info Hero */}
-        <Animated.View 
-          entering={FadeInDown.duration(500).delay(100)} 
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(100)}
           style={[styles.heroCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
           <View style={styles.profileHeader}>
-            <TouchableOpacity 
-              style={[styles.avatarContainer, { backgroundColor: theme.badgeBackground }]} 
+            <TouchableOpacity
+              style={[styles.avatarContainer, { backgroundColor: theme.badgeBackground }]}
               onPress={handlePickImage}
               activeOpacity={0.8}
             >
@@ -243,11 +244,11 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Goal Summary Card */}
-        <Animated.View 
-          entering={FadeInDown.duration(500).delay(150)} 
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(150)}
           style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.goalCardContent}
             onPress={() => router.push('/(tabs)/goal')}
             activeOpacity={0.8}
@@ -261,7 +262,7 @@ export default function ProfileScreen() {
                 {t.target}: {targetWeight} kg
               </Text>
               <Text style={styles.goalDifferenceText}>
-                {absWeightDiff === 0 
+                {absWeightDiff === 0
                   ? t.weightMaintenance
                   : `${t.goalPrefix} ${absWeightDiff.toFixed(1)} kg ${isLoss ? t.loseWeight : t.gainWeight}`
                 }
@@ -271,8 +272,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        <Animated.View 
-          entering={FadeInDown.duration(500).delay(200)} 
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(200)}
           style={[styles.achievementsCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
           <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.currentStreaks}</Text>
@@ -304,12 +305,12 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Menu List */}
-        <Animated.View 
-          entering={FadeInDown.duration(500).delay(300)} 
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(300)}
           style={[styles.menuCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
-          <TouchableOpacity 
-            style={styles.menuItem} 
+          <TouchableOpacity
+            style={styles.menuItem}
             activeOpacity={0.7}
             onPress={() => router.push('/profile-details')}
           >
@@ -324,8 +325,8 @@ export default function ProfileScreen() {
 
 
 
-          <TouchableOpacity 
-            style={styles.menuItem} 
+          <TouchableOpacity
+            style={styles.menuItem}
             activeOpacity={0.7}
             onPress={() => router.push('/privacy-security')}
           >
@@ -338,8 +339,8 @@ export default function ProfileScreen() {
 
           <View style={[styles.menuDivider, { backgroundColor: theme.cardBorder }]} />
 
-          <TouchableOpacity 
-            style={styles.menuItem} 
+          <TouchableOpacity
+            style={styles.menuItem}
             activeOpacity={0.7}
             onPress={() => router.push('/app-preferences')}
           >
@@ -353,8 +354,8 @@ export default function ProfileScreen() {
 
         {/* Logout Button */}
         <Animated.View entering={FadeInDown.duration(500).delay(400)}>
-          <TouchableOpacity 
-            style={styles.logoutBtn} 
+          <TouchableOpacity
+            style={styles.logoutBtn}
             activeOpacity={0.8}
             onPress={handleLogout}
           >
@@ -364,6 +365,7 @@ export default function ProfileScreen() {
         </Animated.View>
 
       </ScrollView>
+
 
       {/* Custom Logout Modal */}
       <Modal
@@ -379,17 +381,17 @@ export default function ProfileScreen() {
             </View>
             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{t.confirmLogout}</Text>
             <Text style={[styles.modalMessage, { color: theme.textMuted }]}>{t.areYouSureLogout}</Text>
-            
+
             <View style={styles.modalButtonsRow}>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalCancelBtn, { borderColor: theme.cardBorder }]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn, { borderColor: theme.cardBorder }]}
                 onPress={() => setLogoutModalVisible(false)}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.modalCancelBtnText, { color: theme.textPrimary }]}>{t.cancel}</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalConfirmBtn]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalConfirmBtn]}
                 onPress={confirmLogoutAction}
                 activeOpacity={0.7}
               >
@@ -399,7 +401,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
