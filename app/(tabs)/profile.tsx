@@ -196,10 +196,6 @@ export default function ProfileScreen() {
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <Text style={[styles.pageTitle, { color: theme.textBrand }]}>{t.myProfile}</Text>
-          <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]} activeOpacity={0.7}>
-            <Ionicons name="notifications-outline" size={24} color="#7EB93C" />
-            <View style={styles.badge} />
-          </TouchableOpacity>
         </Animated.View>
 
         {/* Profile Info Hero */}
@@ -227,10 +223,6 @@ export default function ProfileScreen() {
             <View style={styles.profileDetails}>
               <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>
               <Text style={[styles.profileEmail, { color: theme.textMuted }]}>{email}</Text>
-              <View style={[styles.tierBadge, { backgroundColor: theme.badgeBackground }]}>
-                <Ionicons name="shield-checkmark" size={12} color="#7EB93C" />
-                <Text style={styles.tierText}>{t.premiumMember}</Text>
-              </View>
             </View>
           </View>
 
@@ -334,19 +326,7 @@ export default function ProfileScreen() {
 
           <View style={[styles.menuDivider, { backgroundColor: theme.cardBorder }]} />
 
-          <TouchableOpacity 
-            style={styles.menuItem} 
-            activeOpacity={0.7}
-            onPress={() => router.push('/notification-settings')}
-          >
-            <View style={[styles.menuIconBg, { backgroundColor: theme.menuIconBg }]}>
-              <Ionicons name="notifications-outline" size={20} color="#7EB93C" />
-            </View>
-            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>{t.notificationSettings}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
-          </TouchableOpacity>
 
-          <View style={[styles.menuDivider, { backgroundColor: theme.cardBorder }]} />
 
           <TouchableOpacity
             style={styles.menuItem}
@@ -446,24 +426,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
   },
-  notificationBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: 10,
-    right: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF4D4F',
-  },
+
   heroCard: {
     borderRadius: 28,
     padding: 22,
