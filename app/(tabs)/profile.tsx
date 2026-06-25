@@ -12,10 +12,7 @@ import {
   Text,
   TouchableOpacity,
   useColorScheme,
-<<<<<<< Updated upstream
-=======
   View,
->>>>>>> Stashed changes
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,21 +23,24 @@ const translations = {
     weightMaintenance: 'Weight Maintenance', goalPrefix: 'Goal:', loseWeight: 'Lose weight', gainWeight: 'Gain weight',
     currentStreaks: 'Current Streaks', calorieTarget: 'Calorie Target', waterIntake: 'Water Intake', weightLoss: 'Weight Loss',
     personalDetails: 'Personal Details', notificationSettings: 'Notification Settings', privacySecurity: 'Privacy & Security', appPreferences: 'App Preferences',
-    logOut: 'Log Out', premiumMember: 'Premium Member', days: 'Days'
+    logOut: 'Log Out', premiumMember: 'Premium Member', days: 'Days',
+    confirmLogout: 'Log Out', areYouSureLogout: 'Are you sure you want to log out?', cancel: 'Cancel', yes: 'Yes, Log Out'
   },
   ru: {
     myProfile: 'Мой профиль', weight: 'Вес', height: 'Рост', age: 'Возраст', activeTargetGoal: 'АКТИВНАЯ ЦЕЛЬ', target: 'Цель',
     weightMaintenance: 'Поддержание веса', goalPrefix: 'Цель:', loseWeight: 'Сбросить вес', gainWeight: 'Набрать вес',
     currentStreaks: 'Текущие серии', calorieTarget: 'Цель по калориям', waterIntake: 'Потребление воды', weightLoss: 'Потеря веса',
     personalDetails: 'Личные данные', notificationSettings: 'Настройки уведомлений', privacySecurity: 'Конфиденциальность', appPreferences: 'Настройки',
-    logOut: 'Выйти', premiumMember: 'Премиум', days: 'Дней'
+    logOut: 'Выйти', premiumMember: 'Премиум', days: 'Дней',
+    confirmLogout: 'Выйти', areYouSureLogout: 'Вы уверены, что хотите выйти?', cancel: 'Отмена', yes: 'Да, выйти'
   },
   uz: {
     myProfile: 'Mening profilim', weight: 'Vazn', height: 'Bo\'yi', age: 'Yosh', activeTargetGoal: 'FAOL MAQSAD', target: 'Maqsad',
     weightMaintenance: 'Vaznni saqlash', goalPrefix: 'Maqsad:', loseWeight: 'yo\'qotish', gainWeight: 'oshirish',
     currentStreaks: 'Hozirgi seriyalar', calorieTarget: 'Kaloriya maqsadi', waterIntake: 'Suv ichish', weightLoss: 'Vazn yo\'qotish',
     personalDetails: 'Shaxsiy ma\'lumotlar', notificationSettings: 'Bildirishnomalar', privacySecurity: 'Maxfiylik', appPreferences: 'Ilova sozlamalari',
-    logOut: 'Chiqish', premiumMember: 'Premium A\'zo', days: 'Kun'
+    logOut: 'Chiqish', premiumMember: 'Premium A\'zo', days: 'Kun',
+    confirmLogout: 'Chiqish', areYouSureLogout: 'Haqiqatan ham chiqmoqchimisiz?', cancel: 'Bekor qilish', yes: 'Ha, chiqish'
   }
 };
 
@@ -79,11 +79,8 @@ export default function ProfileScreen() {
   const [height, setHeight] = useState<number | null>(MockStore.height);
   const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
-<<<<<<< Updated upstream
-=======
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const insets = useSafeAreaInsets();
->>>>>>> Stashed changes
 
   // Subscribe to MockStore updates
   useEffect(() => {
@@ -125,7 +122,12 @@ export default function ProfileScreen() {
     });
   }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    setLogoutModalVisible(true);
+  };
+
+  const confirmLogoutAction = async () => {
+    setLogoutModalVisible(false);
     try {
       await supabase.auth.signOut();
       // Reset MockStore values
@@ -386,9 +388,6 @@ export default function ProfileScreen() {
         </Animated.View>
 
       </ScrollView>
-<<<<<<< Updated upstream
-    </SafeAreaView>
-=======
 
       {/* Custom Logout Modal */}
       <Modal
@@ -425,7 +424,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
     </View>
->>>>>>> Stashed changes
   );
 }
 
@@ -680,6 +678,63 @@ const styles = StyleSheet.create({
   logoutBtnText: {
     color: '#FF4D4F',
     fontSize: 16,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1.5,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalCancelBtn: {
+    borderWidth: 1.5,
+  },
+  modalCancelBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalConfirmBtn: {
+    backgroundColor: '#FF4D4F',
+  },
+  modalConfirmBtnText: {
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: '700',
   },
 });
