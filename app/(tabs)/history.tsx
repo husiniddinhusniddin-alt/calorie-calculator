@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  useColorScheme,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StatusBar } from 'expo-status-bar';
 import { MockStore } from '@/constants/store';
 import { supabase } from '@/constants/supabase';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const translations = {
   en: {
@@ -101,6 +101,7 @@ export default function HistoryScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<DayHistory[]>([]);
   const [weekCalories, setWeekCalories] = useState<number[]>([]);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     return MockStore.subscribe(() => {
@@ -256,7 +257,7 @@ export default function HistoryScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -430,7 +431,7 @@ export default function HistoryScreen() {
           );
         })}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
