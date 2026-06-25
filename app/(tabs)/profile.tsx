@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { MockStore } from '@/constants/store';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
 import {
+  Image,
+  Modal,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
-  ScrollView,
   TouchableOpacity,
-  Image,
   useColorScheme,
-  Modal,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import { MockStore } from '@/constants/store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const translations = {
   en: {
@@ -23,21 +23,24 @@ const translations = {
     weightMaintenance: 'Weight Maintenance', goalPrefix: 'Goal:', loseWeight: 'Lose weight', gainWeight: 'Gain weight',
     currentStreaks: 'Current Streaks', calorieTarget: 'Calorie Target', waterIntake: 'Water Intake', weightLoss: 'Weight Loss',
     personalDetails: 'Personal Details', notificationSettings: 'Notification Settings', privacySecurity: 'Privacy & Security', appPreferences: 'App Preferences',
-    logOut: 'Log Out', days: 'Days', confirmLogout: 'Log Out', areYouSureLogout: 'Are you sure you want to log out?', cancel: 'Cancel', yes: 'Yes'
+    logOut: 'Log Out', premiumMember: 'Premium Member', days: 'Days',
+    confirmLogout: 'Log Out', areYouSureLogout: 'Are you sure you want to log out?', cancel: 'Cancel', yes: 'Yes, Log Out'
   },
   ru: {
     myProfile: 'Мой профиль', weight: 'Вес', height: 'Рост', age: 'Возраст', activeTargetGoal: 'АКТИВНАЯ ЦЕЛЬ', target: 'Цель',
     weightMaintenance: 'Поддержание веса', goalPrefix: 'Цель:', loseWeight: 'Сбросить вес', gainWeight: 'Набрать вес',
     currentStreaks: 'Текущие серии', calorieTarget: 'Цель по калориям', waterIntake: 'Потребление воды', weightLoss: 'Потеря веса',
     personalDetails: 'Личные данные', notificationSettings: 'Настройки уведомлений', privacySecurity: 'Конфиденциальность', appPreferences: 'Настройки',
-    logOut: 'Выйти', days: 'Дней', confirmLogout: 'Выход', areYouSureLogout: 'Вы уверены, что хотите выйти?', cancel: 'Отмена', yes: 'Да'
+    logOut: 'Выйти', premiumMember: 'Премиум', days: 'Дней',
+    confirmLogout: 'Выйти', areYouSureLogout: 'Вы уверены, что хотите выйти?', cancel: 'Отмена', yes: 'Да, выйти'
   },
   uz: {
     myProfile: 'Mening profilim', weight: 'Vazn', height: 'Bo\'yi', age: 'Yosh', activeTargetGoal: 'FAOL MAQSAD', target: 'Maqsad',
     weightMaintenance: 'Vaznni saqlash', goalPrefix: 'Maqsad:', loseWeight: 'yo\'qotish', gainWeight: 'oshirish',
     currentStreaks: 'Hozirgi seriyalar', calorieTarget: 'Kaloriya maqsadi', waterIntake: 'Suv ichish', weightLoss: 'Vazn yo\'qotish',
     personalDetails: 'Shaxsiy ma\'lumotlar', notificationSettings: 'Bildirishnomalar', privacySecurity: 'Maxfiylik', appPreferences: 'Ilova sozlamalari',
-    logOut: 'Chiqish', days: 'Kun', confirmLogout: 'Chiqish', areYouSureLogout: 'Haqiqatan ham tizimdan chiqmoqchimisiz?', cancel: 'Bekor qilish', yes: 'Ha'
+    logOut: 'Chiqish', premiumMember: 'Premium A\'zo', days: 'Kun',
+    confirmLogout: 'Chiqish', areYouSureLogout: 'Haqiqatan ham chiqmoqchimisiz?', cancel: 'Bekor qilish', yes: 'Ha, chiqish'
   }
 };
 
@@ -45,7 +48,7 @@ import { supabase } from '@/constants/supabase';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  
+
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
   const [name, setName] = useState<string>(MockStore.name);
@@ -77,6 +80,7 @@ export default function ProfileScreen() {
   const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Subscribe to MockStore updates
   useEffect(() => {
@@ -88,7 +92,7 @@ export default function ProfileScreen() {
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
-        
+
       if (data) {
         MockStore.update({
           name: data.name || MockStore.name,
@@ -164,7 +168,7 @@ export default function ProfileScreen() {
     if (!result.canceled && result.assets && result.assets[0].uri) {
       const selectedUri = result.assets[0].uri;
       MockStore.update({ profileImage: selectedUri });
-      
+
       // Update image url in Supabase profiles table
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -185,23 +189,23 @@ export default function ProfileScreen() {
   const absWeightDiff = Math.abs(weightDiff);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        
+
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <Text style={[styles.pageTitle, { color: theme.textBrand }]}>{t.myProfile}</Text>
         </Animated.View>
 
         {/* Profile Info Hero */}
-        <Animated.View 
-          entering={FadeInDown.duration(500).delay(100)} 
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(100)}
           style={[styles.heroCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
           <View style={styles.profileHeader}>
-            <TouchableOpacity 
-              style={[styles.avatarContainer, { backgroundColor: theme.badgeBackground }]} 
+            <TouchableOpacity
+              style={[styles.avatarContainer, { backgroundColor: theme.badgeBackground }]}
               onPress={handlePickImage}
               activeOpacity={0.8}
             >
@@ -243,11 +247,11 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Goal Summary Card */}
-        <Animated.View 
-          entering={FadeInDown.duration(500).delay(150)} 
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(150)}
           style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.goalCardContent}
             onPress={() => router.push('/(tabs)/goal')}
             activeOpacity={0.8}
@@ -261,7 +265,7 @@ export default function ProfileScreen() {
                 {t.target}: {targetWeight} kg
               </Text>
               <Text style={styles.goalDifferenceText}>
-                {absWeightDiff === 0 
+                {absWeightDiff === 0
                   ? t.weightMaintenance
                   : `${t.goalPrefix} ${absWeightDiff.toFixed(1)} kg ${isLoss ? t.loseWeight : t.gainWeight}`
                 }
@@ -271,8 +275,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        <Animated.View 
-          entering={FadeInDown.duration(500).delay(200)} 
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(200)}
           style={[styles.achievementsCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
           <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.currentStreaks}</Text>
@@ -304,12 +308,12 @@ export default function ProfileScreen() {
         </Animated.View>
 
         {/* Menu List */}
-        <Animated.View 
-          entering={FadeInDown.duration(500).delay(300)} 
+        <Animated.View
+          entering={FadeInDown.duration(500).delay(300)}
           style={[styles.menuCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
         >
-          <TouchableOpacity 
-            style={styles.menuItem} 
+          <TouchableOpacity
+            style={styles.menuItem}
             activeOpacity={0.7}
             onPress={() => router.push('/profile-details')}
           >
@@ -324,8 +328,8 @@ export default function ProfileScreen() {
 
 
 
-          <TouchableOpacity 
-            style={styles.menuItem} 
+          <TouchableOpacity
+            style={styles.menuItem}
             activeOpacity={0.7}
             onPress={() => router.push('/privacy-security')}
           >
@@ -338,8 +342,8 @@ export default function ProfileScreen() {
 
           <View style={[styles.menuDivider, { backgroundColor: theme.cardBorder }]} />
 
-          <TouchableOpacity 
-            style={styles.menuItem} 
+          <TouchableOpacity
+            style={styles.menuItem}
             activeOpacity={0.7}
             onPress={() => router.push('/app-preferences')}
           >
@@ -353,8 +357,8 @@ export default function ProfileScreen() {
 
         {/* Logout Button */}
         <Animated.View entering={FadeInDown.duration(500).delay(400)}>
-          <TouchableOpacity 
-            style={styles.logoutBtn} 
+          <TouchableOpacity
+            style={styles.logoutBtn}
             activeOpacity={0.8}
             onPress={handleLogout}
           >
@@ -379,17 +383,17 @@ export default function ProfileScreen() {
             </View>
             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{t.confirmLogout}</Text>
             <Text style={[styles.modalMessage, { color: theme.textMuted }]}>{t.areYouSureLogout}</Text>
-            
+
             <View style={styles.modalButtonsRow}>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalCancelBtn, { borderColor: theme.cardBorder }]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn, { borderColor: theme.cardBorder }]}
                 onPress={() => setLogoutModalVisible(false)}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.modalCancelBtnText, { color: theme.textPrimary }]}>{t.cancel}</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalBtn, styles.modalConfirmBtn]} 
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalConfirmBtn]}
                 onPress={confirmLogoutAction}
                 activeOpacity={0.7}
               >
@@ -399,7 +403,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -641,23 +645,21 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   modalContent: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: 28,
+    width: '80%',
+    borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1.5,
   },
   modalIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -672,34 +674,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     marginBottom: 24,
-    lineHeight: 22,
   },
   modalButtonsRow: {
     flexDirection: 'row',
     gap: 12,
-    width: '100%',
   },
   modalBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
     alignItems: 'center',
   },
   modalCancelBtn: {
     borderWidth: 1.5,
-    backgroundColor: 'transparent',
+  },
+  modalCancelBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   modalConfirmBtn: {
     backgroundColor: '#FF4D4F',
   },
-  modalCancelBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
   modalConfirmBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: '700',
   },
 });

@@ -1,10 +1,9 @@
-import { Tabs } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from 'react-native';
 import { MockStore } from '@/constants/store';
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const tabTranslations = {
@@ -16,7 +15,7 @@ const tabTranslations = {
 export default function TabLayout() {
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
-  
+
   useEffect(() => {
     return MockStore.subscribe(() => {
       setAppTheme(MockStore.appTheme);
@@ -27,6 +26,7 @@ export default function TabLayout() {
   const systemColorScheme = useColorScheme();
   const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
   const t = tabTranslations[language] || tabTranslations.en;
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -39,8 +39,8 @@ export default function TabLayout() {
           backgroundColor: isDark ? '#171E10' : '#FFFFFF',
           borderTopWidth: 1.5,
           borderTopColor: isDark ? '#2A3A1E' : '#EBF2E5',
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
         },
       }}>
