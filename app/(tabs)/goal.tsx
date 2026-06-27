@@ -1,28 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-  useColorScheme,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import { StatusBar } from 'expo-status-bar';
-import { 
-  Provider as PaperProvider, 
-  TextInput as PaperTextInput, 
-  Snackbar, 
-  Portal 
-} from 'react-native-paper';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { MockStore } from '@/constants/store';
 import { supabase } from '@/constants/supabase';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
+import {
+  Provider as PaperProvider,
+  TextInput as PaperTextInput,
+  Portal,
+  Snackbar
+} from 'react-native-paper';
+import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 
@@ -55,7 +55,7 @@ const translations = {
     motivationAuthor: 'Fitness Journey',
     resetGoal: 'Reset Goal',
     saveGoal: 'Save Goal',
-    
+
     // Alerts/Snackbars
     resetMsg: 'Goal settings reset to defaults.',
     saveSuccess: 'Goals saved successfully! 🎉',
@@ -92,7 +92,7 @@ const translations = {
     motivationAuthor: 'Фитнес-путешествие',
     resetGoal: 'Сбросить цель',
     saveGoal: 'Сохранить цель',
-    
+
     resetMsg: 'Настройки целей сброшены по умолчанию.',
     saveSuccess: 'Цели успешно сохранены! 🎉',
     validWeightErr: 'Пожалуйста, введите корректный целевой вес.',
@@ -128,7 +128,7 @@ const translations = {
     motivationAuthor: 'Salomatlik yo\'li',
     resetGoal: 'Maqsadni tiklash',
     saveGoal: 'Maqsadni saqlash',
-    
+
     resetMsg: 'Maqsad sozlamalari boshlang\'ich holatga qaytarildi.',
     saveSuccess: 'Maqsadlar muvaffaqiyatli saqlandi! 🎉',
     validWeightErr: 'Iltimos, to\'g\'ri maqsadli vaznni kiriting.',
@@ -142,10 +142,10 @@ export default function GoalSettingScreen() {
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
 
-  // Dynamic weight state from MockStore/Supabase (no more hardcoded constants)
   const [currentWeight, setCurrentWeight] = useState<number>(MockStore.currentWeight);
   const [startingWeight, setStartingWeight] = useState<number>(MockStore.startingWeight);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const insets = useSafeAreaInsets();
 
   // Load goal data from Supabase on mount
   useEffect(() => {
@@ -246,7 +246,7 @@ export default function GoalSettingScreen() {
   const absWeightDiff = Math.abs(weightDiff);
 
   const totalGoalWeightChange = startingWeight - parsedTargetWeight;
-  const progressPercent = totalGoalWeightChange > 0 
+  const progressPercent = totalGoalWeightChange > 0
     ? Math.min(Math.max(((startingWeight - currentWeight) / totalGoalWeightChange) * 100, 0), 100)
     : 0;
 
@@ -261,12 +261,12 @@ export default function GoalSettingScreen() {
   const daysRemaining = getDaysRemaining();
 
   const calculateSuggestedCalories = () => {
-    const baseTdee = 2400; 
+    const baseTdee = 2400;
     if (parsedTargetWeight === currentWeight) {
       return baseTdee;
     }
     const weightChangeFactor = isLoss ? -1 : 1;
-    const dailyDeficit = (weeklyWeightGoal * 7700) / 7; 
+    const dailyDeficit = (weeklyWeightGoal * 7700) / 7;
     const suggestion = baseTdee + (weightChangeFactor * dailyDeficit);
     return Math.round(suggestion);
   };
@@ -336,7 +336,7 @@ export default function GoalSettingScreen() {
   const handleResetGoal = () => {
     const defaultDate = new Date();
     defaultDate.setDate(defaultDate.getDate() + 90);
-    
+
     setTargetWeight('82');
     setDailyCalorieGoal('1900');
     setWeeklyWeightGoal(0.5);
@@ -348,7 +348,7 @@ export default function GoalSettingScreen() {
       weeklyWeightGoal: 0.5,
       targetDate: defaultDate,
     });
-    
+
     setSnackbarMessage(t.resetMsg);
     setSnackbarVisible(true);
   };
@@ -363,323 +363,323 @@ export default function GoalSettingScreen() {
 
   return (
     <PaperProvider>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
         {isLoading ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size="large" color="#7EB93C" />
           </View>
         ) : (
           <>
-        <StatusBar style={isDark ? "light" : "dark"} />
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <ScrollView 
-            contentContainerStyle={styles.scroll} 
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Top Header Section */}
-            <Animated.View entering={FadeInDown.duration(500)} style={styles.headerSection}>
-              <View style={styles.flagIconContainer}>
-                <View style={[styles.flagIconInner, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}>
-                  <Ionicons name="flag" size={32} color="#7EB93C" />
-                </View>
-                <View style={styles.pulseRing} />
-              </View>
-              <Text style={[styles.title, { color: theme.textBrand }]}>{t.setGoal}</Text>
-              <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t.trackProgress}</Text>
-            </Animated.View>
-
-            {/* Goal Card */}
-            <Animated.View 
-              entering={FadeInDown.duration(500).delay(100)} 
-              style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+            <StatusBar style={isDark ? "light" : "dark"} />
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ flex: 1 }}
             >
-              <View style={styles.cardHeader}>
-                <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.weightGoal}</Text>
-                <View style={[styles.currentWeightBadge, { backgroundColor: theme.background, borderColor: theme.cardBorder }]}>
-                  <Text style={[styles.currentWeightLabel, { color: theme.textMuted }]}>{t.current}</Text>
-                  <Text style={[styles.currentWeightValue, { color: theme.textBrand }]}>{currentWeight} kg</Text>
-                </View>
-              </View>
-
-              {/* Target Weight Inputs with Stepper */}
-              <View style={styles.weightInputRow}>
-                <TouchableOpacity 
-                  style={[styles.stepperButton, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
-                  onPress={() => adjustTargetWeight(-0.5)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="remove" size={24} color="#7EB93C" />
-                </TouchableOpacity>
-
-                <View style={styles.inputContainer}>
-                  <PaperTextInput
-                    mode="outlined"
-                    label={t.targetWeightLabel}
-                    value={targetWeight}
-                    onChangeText={setTargetWeight}
-                    keyboardType="decimal-pad"
-                    activeOutlineColor="#7EB93C"
-                    outlineColor={theme.inputOutline}
-                    textColor={theme.inputText}
-                    theme={{ colors: { background: theme.inputBackground } }}
-                    style={styles.textInput}
-                    dense
-                  />
-                </View>
-
-                <TouchableOpacity 
-                  style={[styles.stepperButton, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
-                  onPress={() => adjustTargetWeight(0.5)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="add" size={24} color="#7EB93C" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Automatic Difference Callout */}
-              <Animated.View layout={Layout.springify()} style={[styles.diffContainer, { backgroundColor: theme.badgeBackground }]}>
-                <Ionicons 
-                  name={isLoss ? "arrow-down-circle" : "arrow-up-circle"} 
-                  size={20} 
-                  color="#7EB93C" 
-                />
-                <Text style={[styles.diffText, { color: theme.textBrand }]}>
-                  {absWeightDiff === 0 
-                    ? t.maintenance
-                    : isLoss
-                      ? t.remainingToLoss.replace('{diff}', absWeightDiff.toFixed(1))
-                      : t.remainingToGain.replace('{diff}', absWeightDiff.toFixed(1))
-                  }
-                </Text>
-              </Animated.View>
-            </Animated.View>
-
-            {/* Progress Section */}
-            <Animated.View 
-              entering={FadeInDown.duration(500).delay(200)} 
-              style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-            >
-              <View style={styles.progressHeader}>
-                <Text style={[styles.progressTitle, { color: theme.textBrand }]}>{t.goalProgress}</Text>
-                <Text style={styles.progressPctText}>{Math.round(progressPercent)}% {t.completed}</Text>
-              </View>
-
-              <View style={[styles.progressBarBackground, { backgroundColor: theme.badgeBackground }]}>
-                <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]}>
-                  {progressPercent > 0 && <View style={styles.progressBarThumb} />}
-                </View>
-              </View>
-
-              <View style={styles.progressFooter}>
-                <Ionicons name="information-circle-outline" size={16} color={theme.textMuted} />
-                <Text style={[styles.progressFooterText, { color: theme.textMuted }]}>
-                  {absWeightDiff === 0 
-                    ? t.atTargetWeight
-                    : isLoss
-                      ? t.remainingDescLoss.replace('{diff}', absWeightDiff.toFixed(1))
-                      : t.remainingDescGain.replace('{diff}', absWeightDiff.toFixed(1))
-                  }
-                </Text>
-              </View>
-            </Animated.View>
-
-            {/* Calorie Goal Section */}
-            <Animated.View 
-              entering={FadeInDown.duration(500).delay(300)} 
-              style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-            >
-              <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.dailyCalorieTarget}</Text>
-              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t.calorieTargetDesc}</Text>
-
-              <Text style={[styles.subLabel, { color: theme.textBrand }]}>{t.weeklyChangeRate}</Text>
-              <View style={styles.chipContainer}>
-                {[0.25, 0.5, 0.75, 1.0].map((rate) => {
-                  const isSelected = weeklyWeightGoal === rate;
-                  return (
-                    <TouchableOpacity
-                      key={rate}
-                      style={[styles.chip, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }, isSelected && styles.chipActive]}
-                      onPress={() => setWeeklyWeightGoal(rate)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.chipText, { color: theme.textMuted }, isSelected && styles.chipTextActive]}>
-                        {t.kgWk.replace('{rate}', rate.toString())}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Calorie Goal Input */}
-              <View style={styles.calorieInputRow}>
-                <View style={styles.flexInput}>
-                  <PaperTextInput
-                    mode="outlined"
-                    label={t.dailyCaloriesLabel}
-                    value={dailyCalorieGoal}
-                    onChangeText={setDailyCalorieGoal}
-                    keyboardType="number-pad"
-                    activeOutlineColor="#7EB93C"
-                    outlineColor={theme.inputOutline}
-                    textColor={theme.inputText}
-                    theme={{ colors: { background: theme.inputBackground } }}
-                    style={styles.textInput}
-                  />
-                </View>
-                <View style={[styles.suggestedBox, { backgroundColor: theme.suggestedBoxBg, borderColor: theme.cardBorder }]}>
-                  <Text style={[styles.suggestedLabel, { color: theme.textMuted }]}>{t.suggested}</Text>
-                  <Text style={styles.suggestedValue}>{suggestedCalories} kcal</Text>
-                </View>
-              </View>
-            </Animated.View>
-
-            {/* Timeline Section */}
-            <Animated.View 
-              entering={FadeInDown.duration(500).delay(400)} 
-              style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-            >
-              <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.timeline}</Text>
-              <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t.timelineDesc}</Text>
-
-              <TouchableOpacity 
-                style={[styles.datePickerTrigger, { backgroundColor: theme.badgeBackground, borderColor: theme.badgeBorder }]}
-                onPress={() => setShowDatePicker(prev => !prev)}
-                activeOpacity={0.7}
+              <ScrollView
+                contentContainerStyle={styles.scroll}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
               >
-                <View style={styles.dateInfo}>
-                  <Ionicons name="calendar" size={22} color="#7EB93C" />
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={[styles.datePickerLabel, { color: theme.textMuted }]}>{t.targetDateLabel}</Text>
-                    <Text style={styles.datePickerValue}>{formatDateString(targetDate)}</Text>
+                {/* Top Header Section */}
+                <Animated.View entering={FadeInDown.duration(500)} style={styles.headerSection}>
+                  <View style={styles.flagIconContainer}>
+                    <View style={[styles.flagIconInner, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}>
+                      <Ionicons name="flag" size={32} color="#7EB93C" />
+                    </View>
+                    <View style={styles.pulseRing} />
                   </View>
-                </View>
-                <Ionicons name={showDatePicker ? "chevron-up" : "chevron-down"} size={20} color="#7EB93C" />
-              </TouchableOpacity>
+                  <Text style={[styles.title, { color: theme.textBrand }]}>{t.setGoal}</Text>
+                  <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t.trackProgress}</Text>
+                </Animated.View>
 
-              {/* Web Native Date input backup */}
-              {Platform.OS === 'web' && showDatePicker && (
-                <View style={[styles.webDateContainer, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-                  <input
-                    type="date"
-                    value={targetDate.toISOString().split('T')[0]}
-                    min={new Date().toISOString().split('T')[0]}
-                    onChange={(e) => {
-                      if (e.target.value) setTargetDate(new Date(e.target.value));
-                      setShowDatePicker(false);
-                    }}
-                    style={StyleSheet.flatten([styles.webDatePicker, { borderColor: theme.badgeBorder, color: '#7EB93C', backgroundColor: theme.suggestedBoxBg }]) as any}
-                  />
-                  <TouchableOpacity 
-                    style={styles.webDateCloseBtn}
-                    onPress={() => setShowDatePicker(false)}
-                  >
-                    <Text style={styles.webDateCloseText}>{t.done}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                {/* Goal Card */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(100)}
+                  style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+                >
+                  <View style={styles.cardHeader}>
+                    <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.weightGoal}</Text>
+                    <View style={[styles.currentWeightBadge, { backgroundColor: theme.background, borderColor: theme.cardBorder }]}>
+                      <Text style={[styles.currentWeightLabel, { color: theme.textMuted }]}>{t.current}</Text>
+                      <Text style={[styles.currentWeightValue, { color: theme.textBrand }]}>{currentWeight} kg</Text>
+                    </View>
+                  </View>
 
-              {/* Native Mobile Date Picker */}
-              {Platform.OS !== 'web' && showDatePicker && (
-                <View style={[styles.iosDatePickerContainer, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-                  <DateTimePicker
-                    value={targetDate}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                    minimumDate={new Date()}
-                    onChange={handleDateChange}
-                    accentColor="#7EB93C"
-                    themeVariant={isDark ? 'dark' : 'light'}
-                  />
-                  {Platform.OS === 'ios' && (
-                    <TouchableOpacity 
-                      style={styles.iosConfirmButton}
-                      onPress={() => setShowDatePicker(false)}
+                  {/* Target Weight Inputs with Stepper */}
+                  <View style={styles.weightInputRow}>
+                    <TouchableOpacity
+                      style={[styles.stepperButton, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
+                      onPress={() => adjustTargetWeight(-0.5)}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.iosConfirmButtonText}>{t.confirmTargetDate}</Text>
+                      <Ionicons name="remove" size={24} color="#7EB93C" />
                     </TouchableOpacity>
+
+                    <View style={styles.inputContainer}>
+                      <PaperTextInput
+                        mode="outlined"
+                        label={t.targetWeightLabel}
+                        value={targetWeight}
+                        onChangeText={setTargetWeight}
+                        keyboardType="decimal-pad"
+                        activeOutlineColor="#7EB93C"
+                        outlineColor={theme.inputOutline}
+                        textColor={theme.inputText}
+                        theme={{ colors: { background: theme.inputBackground } }}
+                        style={styles.textInput}
+                        dense
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.stepperButton, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
+                      onPress={() => adjustTargetWeight(0.5)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="add" size={24} color="#7EB93C" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Automatic Difference Callout */}
+                  <Animated.View layout={Layout.springify()} style={[styles.diffContainer, { backgroundColor: theme.badgeBackground }]}>
+                    <Ionicons
+                      name={isLoss ? "arrow-down-circle" : "arrow-up-circle"}
+                      size={20}
+                      color="#7EB93C"
+                    />
+                    <Text style={[styles.diffText, { color: theme.textBrand }]}>
+                      {absWeightDiff === 0
+                        ? t.maintenance
+                        : isLoss
+                          ? t.remainingToLoss.replace('{diff}', absWeightDiff.toFixed(1))
+                          : t.remainingToGain.replace('{diff}', absWeightDiff.toFixed(1))
+                      }
+                    </Text>
+                  </Animated.View>
+                </Animated.View>
+
+                {/* Progress Section */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(200)}
+                  style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+                >
+                  <View style={styles.progressHeader}>
+                    <Text style={[styles.progressTitle, { color: theme.textBrand }]}>{t.goalProgress}</Text>
+                    <Text style={styles.progressPctText}>{Math.round(progressPercent)}% {t.completed}</Text>
+                  </View>
+
+                  <View style={[styles.progressBarBackground, { backgroundColor: theme.badgeBackground }]}>
+                    <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]}>
+                      {progressPercent > 0 && <View style={styles.progressBarThumb} />}
+                    </View>
+                  </View>
+
+                  <View style={styles.progressFooter}>
+                    <Ionicons name="information-circle-outline" size={16} color={theme.textMuted} />
+                    <Text style={[styles.progressFooterText, { color: theme.textMuted }]}>
+                      {absWeightDiff === 0
+                        ? t.atTargetWeight
+                        : isLoss
+                          ? t.remainingDescLoss.replace('{diff}', absWeightDiff.toFixed(1))
+                          : t.remainingDescGain.replace('{diff}', absWeightDiff.toFixed(1))
+                      }
+                    </Text>
+                  </View>
+                </Animated.View>
+
+                {/* Calorie Goal Section */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(300)}
+                  style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+                >
+                  <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.dailyCalorieTarget}</Text>
+                  <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t.calorieTargetDesc}</Text>
+
+                  <Text style={[styles.subLabel, { color: theme.textBrand }]}>{t.weeklyChangeRate}</Text>
+                  <View style={styles.chipContainer}>
+                    {[0.25, 0.5, 0.75, 1.0].map((rate) => {
+                      const isSelected = weeklyWeightGoal === rate;
+                      return (
+                        <TouchableOpacity
+                          key={rate}
+                          style={[styles.chip, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }, isSelected && styles.chipActive]}
+                          onPress={() => setWeeklyWeightGoal(rate)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.chipText, { color: theme.textMuted }, isSelected && styles.chipTextActive]}>
+                            {t.kgWk.replace('{rate}', rate.toString())}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Calorie Goal Input */}
+                  <View style={styles.calorieInputRow}>
+                    <View style={styles.flexInput}>
+                      <PaperTextInput
+                        mode="outlined"
+                        label={t.dailyCaloriesLabel}
+                        value={dailyCalorieGoal}
+                        onChangeText={setDailyCalorieGoal}
+                        keyboardType="number-pad"
+                        activeOutlineColor="#7EB93C"
+                        outlineColor={theme.inputOutline}
+                        textColor={theme.inputText}
+                        theme={{ colors: { background: theme.inputBackground } }}
+                        style={styles.textInput}
+                      />
+                    </View>
+                    <View style={[styles.suggestedBox, { backgroundColor: theme.suggestedBoxBg, borderColor: theme.cardBorder }]}>
+                      <Text style={[styles.suggestedLabel, { color: theme.textMuted }]}>{t.suggested}</Text>
+                      <Text style={styles.suggestedValue}>{suggestedCalories} kcal</Text>
+                    </View>
+                  </View>
+                </Animated.View>
+
+                {/* Timeline Section */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(400)}
+                  style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+                >
+                  <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.timeline}</Text>
+                  <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t.timelineDesc}</Text>
+
+                  <TouchableOpacity
+                    style={[styles.datePickerTrigger, { backgroundColor: theme.badgeBackground, borderColor: theme.badgeBorder }]}
+                    onPress={() => setShowDatePicker(prev => !prev)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.dateInfo}>
+                      <Ionicons name="calendar" size={22} color="#7EB93C" />
+                      <View style={{ marginLeft: 12 }}>
+                        <Text style={[styles.datePickerLabel, { color: theme.textMuted }]}>{t.targetDateLabel}</Text>
+                        <Text style={styles.datePickerValue}>{formatDateString(targetDate)}</Text>
+                      </View>
+                    </View>
+                    <Ionicons name={showDatePicker ? "chevron-up" : "chevron-down"} size={20} color="#7EB93C" />
+                  </TouchableOpacity>
+
+                  {/* Web Native Date input backup */}
+                  {Platform.OS === 'web' && showDatePicker && (
+                    <View style={[styles.webDateContainer, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+                      <input
+                        type="date"
+                        value={targetDate.toISOString().split('T')[0]}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => {
+                          if (e.target.value) setTargetDate(new Date(e.target.value));
+                          setShowDatePicker(false);
+                        }}
+                        style={StyleSheet.flatten([styles.webDatePicker, { borderColor: theme.badgeBorder, color: '#7EB93C', backgroundColor: theme.suggestedBoxBg }]) as any}
+                      />
+                      <TouchableOpacity
+                        style={styles.webDateCloseBtn}
+                        onPress={() => setShowDatePicker(false)}
+                      >
+                        <Text style={styles.webDateCloseText}>{t.done}</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
-                </View>
-              )}
 
-              {/* Days remaining badge */}
-              <View style={[styles.daysRemainingContainer, { backgroundColor: theme.badgeBackground }]}>
-                <Ionicons name="time-outline" size={20} color="#7EB93C" />
-                <Text style={[styles.daysRemainingText, { color: theme.textBrand }]}>
-                  {t.daysRemainingDesc.replace('{days}', daysRemaining.toString())}
-                </Text>
-              </View>
-            </Animated.View>
+                  {/* Native Mobile Date Picker */}
+                  {Platform.OS !== 'web' && showDatePicker && (
+                    <View style={[styles.iosDatePickerContainer, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+                      <DateTimePicker
+                        value={targetDate}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                        minimumDate={new Date()}
+                        onChange={handleDateChange}
+                        accentColor="#7EB93C"
+                        themeVariant={isDark ? 'dark' : 'light'}
+                      />
+                      {Platform.OS === 'ios' && (
+                        <TouchableOpacity
+                          style={styles.iosConfirmButton}
+                          onPress={() => setShowDatePicker(false)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.iosConfirmButtonText}>{t.confirmTargetDate}</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
 
-            {/* Motivation Card */}
-            <Animated.View 
-              entering={FadeInDown.duration(500).delay(450)} 
-              style={styles.motivationCard}
-            >
-              <View style={styles.quoteIconContainer}>
-                <MaterialCommunityIcons name="format-quote-close" size={24} color="#EBF2E5" style={{ opacity: 0.3 }} />
-              </View>
-              <Text style={styles.motivationText}>{t.motivationQuote}</Text>
-              <View style={styles.motivationFooter}>
-                <View style={styles.motivationDot} />
-                <Text style={styles.motivationAuthor}>{t.motivationAuthor}</Text>
-              </View>
-            </Animated.View>
+                  {/* Days remaining badge */}
+                  <View style={[styles.daysRemainingContainer, { backgroundColor: theme.badgeBackground }]}>
+                    <Ionicons name="time-outline" size={20} color="#7EB93C" />
+                    <Text style={[styles.daysRemainingText, { color: theme.textBrand }]}>
+                      {t.daysRemainingDesc.replace('{days}', daysRemaining.toString())}
+                    </Text>
+                  </View>
+                </Animated.View>
 
-            {/* Buttons Row */}
-            <Animated.View 
-              entering={FadeInDown.duration(500).delay(500)} 
-              style={styles.buttonRow}
-            >
-              <TouchableOpacity 
-                style={[styles.resetButton, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]} 
-                onPress={handleResetGoal}
-                activeOpacity={0.7}
+                {/* Motivation Card */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(450)}
+                  style={styles.motivationCard}
+                >
+                  <View style={styles.quoteIconContainer}>
+                    <MaterialCommunityIcons name="format-quote-close" size={24} color="#EBF2E5" style={{ opacity: 0.3 }} />
+                  </View>
+                  <Text style={styles.motivationText}>{t.motivationQuote}</Text>
+                  <View style={styles.motivationFooter}>
+                    <View style={styles.motivationDot} />
+                    <Text style={styles.motivationAuthor}>{t.motivationAuthor}</Text>
+                  </View>
+                </Animated.View>
+
+                {/* Buttons Row */}
+                <Animated.View
+                  entering={FadeInDown.duration(500).delay(500)}
+                  style={styles.buttonRow}
+                >
+                  <TouchableOpacity
+                    style={[styles.resetButton, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+                    onPress={handleResetGoal}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.resetButtonText}>{t.resetGoal}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                    onPress={handleSaveGoal}
+                    disabled={isSaving}
+                    activeOpacity={0.85}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.saveButtonText}>{t.saveGoal}</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </Animated.View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+
+            <Portal>
+              <Snackbar
+                visible={snackbarVisible}
+                onDismiss={() => setSnackbarVisible(false)}
+                duration={2500}
+                action={{
+                  label: t.done,
+                  onPress: () => setSnackbarVisible(false),
+                  textColor: '#7EB93C',
+                }}
+                style={styles.snackbar}
               >
-                <Text style={styles.resetButtonText}>{t.resetGoal}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} 
-                onPress={handleSaveGoal}
-                disabled={isSaving}
-                activeOpacity={0.85}
-              >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.saveButtonText}>{t.saveGoal}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-
-        <Portal>
-          <Snackbar
-            visible={snackbarVisible}
-            onDismiss={() => setSnackbarVisible(false)}
-            duration={2500}
-            action={{
-              label: t.done,
-              onPress: () => setSnackbarVisible(false),
-              textColor: '#7EB93C',
-            }}
-            style={styles.snackbar}
-          >
-            {snackbarMessage}
-          </Snackbar>
-        </Portal>
+                {snackbarMessage}
+              </Snackbar>
+            </Portal>
           </>
         )}
-      </SafeAreaView>
+      </View>
     </PaperProvider>
   );
 }

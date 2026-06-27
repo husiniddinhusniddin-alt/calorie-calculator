@@ -8,19 +8,22 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
+  SafeAreaView,
+
+ main
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   useColorScheme,
-  View,
-  Modal
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -235,6 +238,7 @@ export default function PedometerScreen() {
   const [selectedDayIdx, setSelectedDayIdx] = useState(2); // index 2 is Today
   const [activeMode, setActiveMode] = useState(0); // 0=Day, 1=Week, 2=Month
   const [isMapFullScreen, setIsMapFullScreen] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     return MockStore.subscribe(() => {
@@ -584,7 +588,7 @@ export default function PedometerScreen() {
   const heartRate = 92; // Mock heart rate
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -765,29 +769,27 @@ export default function PedometerScreen() {
               <Text style={{ color: theme.textMuted }}>No route data available</Text>
             </View>
           )}
-          <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 }}>
-            <View style={{ padding: 16, alignItems: 'flex-end' }}>
-              <TouchableOpacity 
-                onPress={() => setIsMapFullScreen(false)} 
-                style={{ 
-                  backgroundColor: theme.cardBackground, 
-                  borderRadius: 20, 
-                  padding: 8, 
-                  shadowColor: '#000', 
-                  shadowOffset: { width: 0, height: 2 }, 
-                  shadowOpacity: 0.25, 
-                  shadowRadius: 3.84, 
-                  elevation: 5 
-                }}
-              >
-                <Ionicons name="close" size={24} color={theme.textPrimary} />
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
+          <View style={{ position: 'absolute', top: Math.max(insets.top + 8, 20), right: 16, zIndex: 10 }}>
+            <TouchableOpacity
+              onPress={() => setIsMapFullScreen(false)}
+              style={{
+                backgroundColor: theme.cardBackground,
+                borderRadius: 20,
+                padding: 8,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5
+              }}
+            >
+              <Ionicons name="close" size={24} color={theme.textPrimary} />
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
-    </SafeAreaView>
+    </View>
   );
 }
 
