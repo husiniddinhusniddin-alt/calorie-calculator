@@ -338,7 +338,36 @@ const analyzeFoodWithAI = async (base64Image: string) => {
         {
           role: "user",
           content: [
-            { type: "text", text: "Analyze this food image. Provide exact estimated calories, carbs, protein, and fat. Return ONLY a JSON object in this format (no markdown formatting): { \"title\": \"Name of dish\", \"subtitle\": \"Short desc\", \"serving\": 1, \"calories\": 400, \"macros\": { \"carbs\": 20, \"protein\": 10, \"fat\": 15 }, \"ingredients\": [ { \"name\": \"Ingredient\", \"weight\": \"100g\", \"calories\": 200, \"carbs\": 10, \"protein\": 5, \"fat\": 10 } ] } If there are multiple ingredients, list them. Ensure all macros numbers are integers. IMPORTANT: If there is no food in the image, or the image is of too poor quality to identify any food, return ONLY this JSON object: { \"error\": \"not_food\" }" },
+            {
+              type: "text",
+              text: "You are an AI food calorie analyzer. Your primary goal is to identify real food items from images and estimate their calories as accurately as possible.\n\n" +
+                    "Rules:\n" +
+                    "1. First, determine whether the image contains real, edible food.\n" +
+                    "2. If you are reasonably confident (70% or higher) that the image shows real food, or if the image is uncertain but appears to contain food, analyze it and make your best estimate instead of rejecting it.\n" +
+                    "3. Do NOT reject an image simply because of poor lighting, homemade appearance, low image quality, partial visibility, or if the food is in a bowl/plate/open packaging.\n" +
+                    "4. Reject the image ONLY if you are highly confident it does NOT contain real food, such as drawings, illustrations, paintings, 3D renders, video game screenshots, toys, plastic food, empty scenes, people without visible food, animals, furniture, or non-food objects.\n" +
+                    "5. Never hallucinate food that is clearly absent.\n" +
+                    "6. If multiple foods are present, identify each separately, estimate for each, and sum them in the total.\n" +
+                    "7. If confidence is low, state that the estimate is approximate (e.g. in the subtitle) rather than refusing to analyze.\n\n" +
+                    "Output Format:\n" +
+                    "You must return ONLY a JSON object in this format (no markdown formatting):\n" +
+                    "If Food Detected is Yes:\n" +
+                    "{\n" +
+                    "  \"title\": \"Name of the dish(es) found\",\n" +
+                    "  \"subtitle\": \"Portion size / description (indicate if approximate if confidence is low)\",\n" +
+                    "  \"serving\": 1,\n" +
+                    "  \"calories\": 450,\n" +
+                    "  \"macros\": { \"carbs\": 40, \"protein\": 20, \"fat\": 15 },\n" +
+                    "  \"ingredients\": [\n" +
+                    "    { \"name\": \"Ingredient / component name\", \"weight\": \"100g\", \"calories\": 200, \"carbs\": 20, \"protein\": 10, \"fat\": 8 }\n" +
+                    "  ]\n" +
+                    "}\n" +
+                    "If Food Detected is No (rejected as non-food with high confidence):\n" +
+                    "{\n" +
+                    "  \"error\": \"not_food\",\n" +
+                    "  \"reason\": \"Explain why the image does not appear to contain real edible food with high confidence\"\n" +
+                    "}"
+            },
             {
               type: "image_url",
               image_url: {

@@ -12,7 +12,8 @@ import {
   Text,
   TouchableOpacity,
   useColorScheme,
-  View
+  View,
+  ActivityIndicator
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,6 +80,7 @@ export default function ProfileScreen() {
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Subscribe to MockStore updates
   useEffect(() => {
@@ -121,11 +123,12 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = () => {
+    setIsLoggingOut(false);
     setLogoutModalVisible(true);
   };
 
   const confirmLogoutAction = async () => {
-    setLogoutModalVisible(false);
+    setIsLoggingOut(true);
     try {
       await supabase.auth.signOut();
       // Reset MockStore values
@@ -141,10 +144,14 @@ export default function ProfileScreen() {
         age: null,
         height: null,
       });
+      setLogoutModalVisible(false);
       router.replace('/(auth)/login');
     } catch (err) {
       console.warn('Sign out error:', err);
+      setLogoutModalVisible(false);
       router.replace('/(auth)/login');
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -373,7 +380,7 @@ export default function ProfileScreen() {
         visible={logoutModalVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setLogoutModalVisible(false)}
+        onRequestClose={() => { if (!isLoggingOut) setLogoutModalVisible(false); }}
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
@@ -384,20 +391,28 @@ export default function ProfileScreen() {
             <Text style={[styles.modalMessage, { color: theme.textMuted }]}>{t.areYouSureLogout}</Text>
 
             <View style={styles.modalButtonsRow}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalCancelBtn, { borderColor: theme.cardBorder }]}
-                onPress={() => setLogoutModalVisible(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.modalCancelBtnText, { color: theme.textPrimary }]}>{t.cancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalConfirmBtn]}
-                onPress={confirmLogoutAction}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.modalConfirmBtnText}>{t.yes}</Text>
-              </TouchableOpacity>
+              {isLoggingOut ? (
+                <View style={{ flex: 1, height: 48, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color="#FF4D4F" />
+                </View>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalCancelBtn, { borderColor: theme.cardBorder }]}
+                    onPress={() => setLogoutModalVisible(false)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.modalCancelBtnText, { color: theme.textPrimary }]}>{t.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalBtn, styles.modalConfirmBtn]}
+                    onPress={confirmLogoutAction}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.modalConfirmBtnText}>{t.yes}</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         </View>
