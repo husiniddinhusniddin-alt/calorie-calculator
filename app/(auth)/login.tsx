@@ -12,11 +12,14 @@ import {
   Dimensions,
   Pressable,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '@/constants/supabase';
+import { MockStore } from '@/constants/store';
 
 const { height, width } = Dimensions.get('window');
 
@@ -25,10 +28,13 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (loading) return;
+
     let isValid = true;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -50,8 +56,102 @@ export default function LoginScreen() {
     }
 
     if (isValid) {
-      // Navigate to the main tabs app
-      router.replace('/(tabs)');
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+
+        if (error) {
+          Alert.alert('Xatolik', error.message);
+          setLoading(false);
+          return;
+        }
+
+        if (data.user) {
+          // Fetch user profile settings from Supabase
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .maybeSingle();
+
+          if (profileError) {
+            console.warn('Profile fetch failed:', profileError.message);
+          }
+
+          if (profile) {
+            // Update MockStore with user's settings from Supabase
+            MockStore.update({
+              name: profile.name || data.user.email?.split('@')[0] || 'User',
+              email: profile.email || data.user.email || '',
+              profileImage: profile.profile_image || null,
+              targetWeight: parseFloat(profile.target_weight) || 82,
+              currentWeight: parseFloat(profile.current_weight) || 85,
+              startingWeight: parseFloat(profile.starting_weight) || 88,
+              dailyCalorieGoal: parseFloat(profile.daily_calorie_goal) || 1900,
+              weeklyWeightGoal: parseFloat(profile.weekly_weight_goal) || 0.5,
+              targetDate: profile.target_date ? new Date(profile.target_date) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+              age: profile.age || null,
+              height: profile.height || null,
+              calorieStreak: profile.calorie_streak ?? 0,
+              waterStreak: profile.water_streak ?? 0,
+              appTheme: profile.app_theme ?? 'system',
+              language: profile.language ?? 'en',
+              notifications: profile.notifications ?? MockStore.notifications,
+            });
+          } else {
+            // Profile missing (e.g. from email confirmation), create it now
+            const meta = data.user.user_metadata || {};
+            const newProfile = {
+              id: data.user.id,
+              email: data.user.email,
+              phone: meta.phone || '',
+              name: data.user.email?.split('@')[0] || 'User',
+              current_weight: meta.current_weight || 85,
+              starting_weight: meta.starting_weight || 85,
+              target_weight: meta.target_weight || 82,
+              daily_calorie_goal: 1900,
+              weekly_weight_goal: 0.5,
+              target_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+              age: null,
+              height: null,
+              calorie_streak: 0,
+              water_streak: 0,
+              app_theme: 'system',
+              language: 'en',
+              notifications: MockStore.notifications,
+            };
+            
+            await supabase.from('profiles').insert(newProfile);
+            
+            MockStore.update({
+              name: newProfile.name,
+              email: newProfile.email || '',
+              profileImage: null,
+              targetWeight: newProfile.target_weight,
+              currentWeight: newProfile.current_weight,
+              startingWeight: newProfile.starting_weight,
+              dailyCalorieGoal: newProfile.daily_calorie_goal,
+              weeklyWeightGoal: newProfile.weekly_weight_goal,
+              age: newProfile.age,
+              height: newProfile.height,
+              calorieStreak: newProfile.calorie_streak,
+              waterStreak: newProfile.water_streak,
+              appTheme: newProfile.app_theme as 'light' | 'dark' | 'system',
+              language: newProfile.language as 'en' | 'ru' | 'uz',
+              notifications: newProfile.notifications,
+            });
+          }
+
+          router.replace('/(tabs)');
+        }
+      } catch (err: any) {
+        Alert.alert('Xatolik', err.message || 'Kutilmagan xatolik yuz berdi');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -155,10 +255,15 @@ export default function LoginScreen() {
               {/* Login Button */}
               <TouchableOpacity 
                 activeOpacity={0.8} 
-                style={styles.loginButton}
+                style={[styles.loginButton, loading && { opacity: 0.7 }]}
                 onPress={handleLogin}
+                disabled={loading}
               >
-                <Text style={styles.loginButtonText}>Log In</Text>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Log In</Text>
+                )}
               </TouchableOpacity>
 
               <View style={styles.footerContainer}>

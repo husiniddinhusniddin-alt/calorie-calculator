@@ -1,523 +1,1034 @@
-import React, { useState } from 'react';
+import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import { Pedometer } from 'expo-sensors';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
 import {
+  Dimensions,
+  Modal,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
-  TextInput,
   TouchableOpacity,
-  ScrollView,
-  Image,
-  Dimensions,
-  SafeAreaView,
-  Alert,
+  useColorScheme,
+  View
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown, FadeInUp, SlideInRight } from 'react-native-reanimated';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import Animated, {
+  FadeInDown,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const DISH_RESULTS = [
-  {
-    id: '1',
-    name: 'Carbonara',
-    description: 'This cheesy pasta dish',
-    calories: 384,
-    carbs: '51.7g',
-    protein: '16.2g',
-    fats: '10.8g',
-    image: require('@/assets/images/pasta_carbonara.png'),
-    category: 'pasta',
+// ─── Translations ─────────────────────────────────────────────────────────────
+const translations = {
+  en: {
+    dailyActivity: 'Daily Activity',
+    stepCount: 'Step Count',
+    stepGoal: 'Step Goal',
+    distance: 'Distance',
+    time: 'Time',
+    heart: 'Heart',
+    caloriesEaten: 'Eaten',
+    caloriesBurned: 'Burned',
+    steps: 'Steps',
+    distanceLabel: 'Distance',
+    day: 'Day',
+    week: 'Week',
+    month: 'Month',
+    bpm: 'bpm',
+    km: 'Km',
+    kcal: 'kcal',
   },
-  {
-    id: '2',
-    name: 'Milano',
-    description: 'Classic Milanese tomato pasta',
-    calories: 401,
-    carbs: '54.0g',
-    protein: '16.9g',
-    fats: '11.2g',
-    image: require('@/assets/images/pasta_carbonara.png'), // Reuse pasta image
-    category: 'pasta',
+  ru: {
+    dailyActivity: 'Активность',
+    stepCount: 'Шагов',
+    stepGoal: 'Цель шагов',
+    distance: 'Дистанция',
+    time: 'Время',
+    heart: 'Пульс',
+    caloriesEaten: 'Съедено',
+    caloriesBurned: 'Сожжено',
+    steps: 'Шагов',
+    distanceLabel: 'Дистанция',
+    day: 'День',
+    week: 'Неделя',
+    month: 'Месяц',
+    bpm: 'уд/м',
+    km: 'Км',
+    kcal: 'ккал',
   },
-  {
-    id: '3',
-    name: 'Pesto Pasta',
-    description: 'Fresh basil pesto spaghetti',
-    calories: 342,
-    carbs: '48.2g',
-    protein: '12.4g',
-    fats: '14.1g',
-    image: require('@/assets/images/pasta_carbonara.png'),
-    category: 'vegetables',
+  uz: {
+    dailyActivity: 'Faollik',
+    stepCount: 'Qadamlar',
+    stepGoal: 'Qadam maqsadi',
+    distance: 'Masofa',
+    time: 'Vaqt',
+    heart: 'Yurak',
+    caloriesEaten: 'Yeyildi',
+    caloriesBurned: 'Yondirildi',
+    steps: 'Qadamlar',
+    distanceLabel: 'Masofa',
+    day: 'Kun',
+    week: 'Hafta',
+    month: 'Oy',
+    bpm: 'ur/m',
+    km: 'Km',
+    kcal: 'kkal',
+  },
+};
+
+// ─── Week Days ────────────────────────────────────────────────────────────────
+const getWeekDays = () => {
+  const today = new Date();
+  const days = [];
+  for (let i = -2; i <= 2; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    days.push({
+      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      date: d.getDate(),
+      isToday: i === 0,
+    });
   }
-];
+  return days;
+};
 
-export default function SearchScreen() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('pasta');
-  const [selectedDish, setSelectedDish] = useState<typeof DISH_RESULTS[0] | null>(null);
-  
-  // Detail slider state (portion weight in grams)
-  const [portionWeight, setPortionWeight] = useState(214);
-  const weights = Array.from({ length: 11 }, (_, i) => 210 + i);
-
-  const filteredDishes = DISH_RESULTS.filter(dish => {
-    const matchesQuery = dish.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory ? dish.category === selectedCategory : true;
-    return matchesQuery && matchesCategory;
-  });
-
-  const handleAddPortion = () => {
-    if (selectedDish) {
-      Alert.alert(
-        'Added to Diary',
-        `${selectedDish.name} (${portionWeight}g) has been added.`,
-        [{ text: 'OK', onPress: () => setSelectedDish(null) }]
-      );
-    }
-  };
+// ─── Circular Step Ring ───────────────────────────────────────────────────────
+const StepRing = ({ steps, goal, isDark, t }: any) => {
+  const size = SCREEN_WIDTH * 0.55;
+  const stroke = 18;
+  const totalDashes = 60;
+  // Ensure we display at least a small portion if > 0, cap at 1
+  const percentage = Math.min(Math.max(steps / goal, 0), 1);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
-      
-      {!selectedDish ? (
-        // SEARCH LIST VIEW
-        <View style={styles.mainView}>
-          <Text style={styles.headerTitle}>Search Food</Text>
-          
-          {/* Custom Search Box with voice mic */}
-          <View style={styles.searchBox}>
-            <Ionicons name="search" size={20} color="#7EB93C" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search dishes..."
-              placeholderTextColor="#999"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Dashed ring */}
+      <View style={{ position: 'absolute', width: size, height: size }}>
+        {Array.from({ length: totalDashes }).map((_, i) => {
+          const angle = (360 / totalDashes) * i - 90;
+          const rad = (angle * Math.PI) / 180;
+          const r = size / 2 - stroke / 2;
+          const cx = size / 2 + r * Math.cos(rad);
+          const cy = size / 2 + r * Math.sin(rad);
+          const isFilled = (i / totalDashes) <= percentage && steps > 0;
+          return (
+            <View
+              key={i}
+              style={{
+                position: 'absolute',
+                width: 4,
+                height: stroke,
+                borderRadius: 2,
+                backgroundColor: isFilled
+                  ? '#7EB93C'
+                  : isDark ? '#2A3A1E' : '#E5EDE0',
+                left: cx - 2,
+                top: cy - stroke / 2,
+                transform: [{ rotate: `${angle + 90}deg` }],
+              }}
             />
-            <TouchableOpacity style={styles.micButton}>
-              <Ionicons name="mic-outline" size={20} color="#666" />
+          );
+        })}
+      </View>
+
+      {/* Center text */}
+      <View style={{ alignItems: 'center' }}>
+        <Ionicons name="footsteps" size={32} color="#7EB93C" style={{ marginBottom: -4 }} />
+        <Text style={[styles.ringSteps, { color: isDark ? '#FAFCF8' : '#1A1A1A' }]}>
+          {steps.toLocaleString()}
+        </Text>
+        <Text style={[styles.ringLabel, { color: isDark ? '#9AA88E' : '#666' }]}>{t.stepCount}</Text>
+        <Text style={[styles.ringGoal, { color: isDark ? '#6B785E' : '#999' }]}>
+          {t.stepGoal}: {goal.toLocaleString()}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+// ─── Route Map ────────────────────────────────────────────────────────────────
+type LatLng = { latitude: number; longitude: number };
+
+const RouteMap = ({ isDark, routePoints, onPress }: { isDark: boolean; routePoints: LatLng[], onPress?: () => void }) => {
+  const routeColor = '#7EB93C';
+  const bgColor = isDark ? '#1A2310' : '#F5F9F0';
+  const textColor = isDark ? '#8a9e7a' : '#5a7a3a';
+
+  if (routePoints.length === 0) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.mapContainer, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name="walk-outline" size={32} color={routeColor} />
+        <Text style={{ color: textColor, marginTop: 8, fontSize: 13 }}>
+          Start walking to see your route
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  const first = routePoints[0];
+  const last = routePoints[routePoints.length - 1];
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.mapContainer, { overflow: 'hidden', backgroundColor: bgColor }]}>
+      <View pointerEvents="none" style={{ flex: 1 }}>
+        <MapView
+          style={{ flex: 1, width: '100%', height: '100%' }}
+          initialRegion={{
+            latitude: last.latitude,
+            longitude: last.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          }}
+          userInterfaceStyle={isDark ? "dark" : "light"}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          pitchEnabled={false}
+          rotateEnabled={false}
+        >
+          <Polyline
+            coordinates={routePoints}
+            strokeColor={routeColor}
+            strokeWidth={4}
+          />
+          {first && (
+            <Marker
+              coordinate={first}
+              title="Start"
+              pinColor="green"
+            />
+          )}
+          {last && (
+            <Marker
+              coordinate={last}
+              title="Current"
+              pinColor="blue"
+            />
+          )}
+        </MapView>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+export default function PedometerScreen() {
+  const [appTheme, setAppTheme] = useState(MockStore.appTheme);
+  const [language, setLanguage] = useState(MockStore.language);
+  const [userName] = useState(MockStore.name);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const [stepHistory, setStepHistory] = useState<Record<string, number>>({});
+  const [pastStepCount, setPastStepCount] = useState(0);
+  const [currentStepCount, setCurrentStepCount] = useState(0);
+  const [caloriesEaten, setCaloriesEaten] = useState(0);
+  const [debugMsg, setDebugMsg] = useState('Init...');
+  const [routePoints, setRoutePoints] = useState<{ latitude: number; longitude: number }[]>([]);
+
+  const [selectedDayIdx, setSelectedDayIdx] = useState(2); // index 2 is Today
+  const [activeMode, setActiveMode] = useState(0); // 0=Day, 1=Week, 2=Month
+  const [isMapFullScreen, setIsMapFullScreen] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    return MockStore.subscribe(() => {
+      setAppTheme(MockStore.appTheme);
+      setLanguage(MockStore.language);
+    });
+  }, []);
+
+  // 1. Ask permissions & initialize Pedometer (with GPS fallback for Android)
+  useEffect(() => {
+    let pedometerSub: Pedometer.Subscription | null = null;
+    let locationSub: Location.LocationSubscription | null = null;
+    let lastLocation: { lat: number; lon: number; timestamp?: number } | null = null;
+    let gpsStepAccumulator = 0;
+    const STEP_LENGTH_M = 0.762; // average step ~76.2 cm
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Haversine distance between two GPS coords in meters
+    const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371000;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const initPedometer = async () => {
+      try {
+        // Request Location permission
+        const locPerm = await Location.getForegroundPermissionsAsync();
+        if (!locPerm.granted && locPerm.canAskAgain) {
+          await Location.requestForegroundPermissionsAsync();
+        }
+
+        // Request Pedometer permission
+        let pedPerm = await Pedometer.getPermissionsAsync();
+        if (!pedPerm.granted && pedPerm.canAskAgain) {
+          pedPerm = await Pedometer.requestPermissionsAsync();
+        }
+        const pedGranted = pedPerm.granted;
+
+        // Check if native pedometer is available
+        const isAvailable = await Pedometer.isAvailableAsync();
+        // Use native only if BOTH available AND permission granted
+        const useNative = isAvailable && pedGranted;
+        setDebugMsg(`Perm: ${pedGranted ? 'OK' : 'Deny'} | Avail: ${isAvailable} | Mode: ${useNative ? 'Native' : 'GPS'}`);
+
+        // Load stored history
+        const historyStr = await AsyncStorage.getItem('pedometer_history');
+        const loadedHistory = historyStr ? JSON.parse(historyStr) : {};
+        setStepHistory(loadedHistory);
+
+        if (useNative) {
+          // ── iOS path: native pedometer + GPS for route ──────────────────
+          let baseSteps = loadedHistory[todayStr] || 0;
+          try {
+            const start = new Date();
+            start.setHours(0, 0, 0, 0);
+            const end = new Date();
+            const past = await Pedometer.getStepCountAsync(start, end);
+            if (past && past.steps !== undefined) {
+              baseSteps = past.steps;
+            }
+          } catch (e) {
+            // fallback to stored history on error
+          }
+          setPastStepCount(baseSteps);
+
+          pedometerSub = Pedometer.watchStepCount(result => {
+            setCurrentStepCount(result.steps);
+            setDebugMsg(prev => prev.split(' | Live:')[0] + ` | Live: ${result.steps}`);
+          });
+
+          // Also track GPS route on iOS
+          const locGranted = await Location.getForegroundPermissionsAsync();
+          if (locGranted.granted) {
+            try {
+              const initPos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+              setRoutePoints([{ latitude: initPos.coords.latitude, longitude: initPos.coords.longitude }]);
+            } catch (_) { }
+
+            locationSub = await Location.watchPositionAsync(
+              { accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 3000 },
+              (loc) => {
+                const { latitude, longitude } = loc.coords;
+                setRoutePoints(prev => [...prev, { latitude, longitude }]);
+              }
+            );
+          }
+        } else {
+          // ── Android path: GPS-based step estimation ─────────────────────
+          const locGranted = await Location.getForegroundPermissionsAsync();
+          if (!locGranted.granted) {
+            setDebugMsg('GPS permission denied — steps unavailable');
+            return;
+          }
+
+          // Restore today's GPS steps from history
+          const savedGpsSteps = loadedHistory[todayStr] || 0;
+          gpsStepAccumulator = savedGpsSteps;
+          setPastStepCount(savedGpsSteps);
+          setDebugMsg(`GPS mode | Saved steps: ${savedGpsSteps}`);
+
+          // Get initial position to show on map immediately
+          try {
+            const initPos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            setRoutePoints([{ latitude: initPos.coords.latitude, longitude: initPos.coords.longitude }]);
+          } catch (_) { }
+
+          locationSub = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.High,
+              distanceInterval: 2, // update every 2 metres moved
+              timeInterval: 1500,
+            },
+            (location) => {
+              const { latitude: lat, longitude: lon } = location.coords;
+              // Android sometimes returns -1 for speed — use raw distance filtering instead
+              const rawSpeed = location.coords.speed ?? -1;
+              const timestamp = location.timestamp;
+
+              if (lastLocation) {
+                const dist = haversineDistance(lastLocation.lat, lastLocation.lon, lat, lon);
+
+                // Calculate speed from distance+time if GPS speed unreliable
+                const timeDeltaSec = lastLocation.timestamp
+                  ? (timestamp - lastLocation.timestamp) / 1000
+                  : 2;
+                const calcSpeed = timeDeltaSec > 0 ? dist / timeDeltaSec : 0;
+                const speed = rawSpeed >= 0 ? rawSpeed : calcSpeed;
+
+                // Only count if walking/running pace (0.4–8 m/s) and distance ≥ 1m
+                if (dist >= 1 && speed >= 0.4 && speed <= 8) {
+                  const newSteps = Math.round(dist / STEP_LENGTH_M);
+                  gpsStepAccumulator += newSteps;
+                  setCurrentStepCount(gpsStepAccumulator);
+                  setDebugMsg(`GPS | ${dist.toFixed(1)}m | ${speed.toFixed(1)}m/s | steps: ${gpsStepAccumulator}`);
+                }
+                // Always add point to route for drawing
+                setRoutePoints(prev => [...prev, { latitude: lat, longitude: lon }]);
+              }
+              lastLocation = { lat, lon, timestamp };
+            }
+          );
+        }
+      } catch (err: any) {
+        setDebugMsg(`Err: ${err.message}`);
+      }
+    };
+
+    initPedometer();
+
+    return () => {
+      pedometerSub?.remove();
+      locationSub?.remove();
+    };
+  }, []);
+
+  // 2. Save total steps for today when it updates
+  const todayStr = new Date().toISOString().split('T')[0];
+  const totalTodaySteps = pastStepCount + currentStepCount;
+
+  useEffect(() => {
+    if (totalTodaySteps > 0) {
+      setStepHistory(prev => {
+        const currentVal = prev[todayStr] || 0;
+        const newVal = Math.max(currentVal, totalTodaySteps);
+        if (newVal !== currentVal) {
+          const updated = { ...prev, [todayStr]: newVal };
+          AsyncStorage.setItem('pedometer_history', JSON.stringify(updated));
+          return updated;
+        }
+        return prev;
+      });
+
+      // Sync to Supabase backend
+      if (userId) {
+        const syncTimeout = setTimeout(async () => {
+          const { data } = await supabase
+            .from('diary_entries')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('date', todayStr)
+            .eq('meal_type', 'steps_history')
+            .single();
+
+          const itemsJson = JSON.stringify(routePoints.length > 0 ? routePoints : ['steps_sync']);
+
+          if (data) {
+            await supabase
+              .from('diary_entries')
+              .update({ calories: totalTodaySteps, items: itemsJson })
+              .eq('id', data.id);
+          } else {
+            await supabase
+              .from('diary_entries')
+              .insert({
+                user_id: userId,
+                date: todayStr,
+                meal_type: 'steps_history',
+                calories: totalTodaySteps,
+                items: itemsJson
+              });
+          }
+        }, 5000); // 5 sec debounce
+        return () => clearTimeout(syncTimeout);
+      }
+    }
+  }, [totalTodaySteps, todayStr, userId, routePoints]);
+
+  // 2b. Fetch historical steps from Supabase backend
+  useEffect(() => {
+    if (!userId) return;
+    const fetchStepHistory = async () => {
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .select('date, calories, items')
+        .eq('user_id', userId)
+        .eq('meal_type', 'steps_history');
+
+      if (data && !error) {
+        // Load today's route points
+        const todayData = data.find((row: any) => row.date === todayStr);
+        if (todayData && todayData.items) {
+          try {
+            const pts = JSON.parse(todayData.items);
+            if (Array.isArray(pts) && pts.length > 0 && pts[0].latitude) {
+              setRoutePoints(prev => {
+                // To avoid duplicate merging, check if we already have these
+                if (prev.length > 0 && prev[0].latitude === pts[0].latitude) return prev;
+                return [...pts, ...prev];
+              });
+            }
+          } catch (e) { }
+        }
+
+        setStepHistory(prev => {
+          const newHistory = { ...prev };
+          let changed = false;
+          data.forEach((row: any) => {
+            if ((newHistory[row.date] || 0) < row.calories) {
+              newHistory[row.date] = row.calories;
+              changed = true;
+            }
+          });
+          if (changed) {
+            AsyncStorage.setItem('pedometer_history', JSON.stringify(newHistory));
+            return newHistory;
+          }
+          return prev;
+        });
+      }
+    };
+    fetchStepHistory();
+  }, [userId, todayStr]);
+
+  // 3. Fetch calories eaten from Supabase
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) setUserId(data.user.id);
+    };
+    getUser();
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    const fetchEaten = async () => {
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .select('calories')
+        .eq('user_id', userId)
+        .eq('date', todayStr)
+        .neq('meal_type', 'steps_history');
+
+      if (data && !error) {
+        const total = data.reduce((s: number, m: any) => s + (m.calories || 0), 0);
+        setCaloriesEaten(total);
+      }
+    };
+    fetchEaten();
+  }, [userId, todayStr]);
+
+  const systemColorScheme = useColorScheme();
+  const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
+  const t = translations[language as keyof typeof translations] || translations.en;
+
+  const theme = {
+    background: isDark ? '#0F140A' : '#F7FAF3',
+    cardBackground: isDark ? '#171E10' : '#FFFFFF',
+    cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A1A1A',
+    textSecondary: isDark ? '#9AA88E' : '#555',
+    textMuted: isDark ? '#6B785E' : '#888',
+    pillBackground: isDark ? '#23321A' : '#F5FAF0',
+  };
+
+  const weekDays = getWeekDays();
+  const modes = [t.day, t.week, t.month];
+
+  // Helper to sum steps over a period
+  const getPeriodSteps = (period: number) => {
+    if (period === 0) return totalTodaySteps;
+    const daysToSum = period === 1 ? 7 : 30;
+    let sum = 0;
+    const today = new Date();
+    for (let i = 0; i < daysToSum; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dStr = d.toISOString().split('T')[0];
+      if (i === 0) sum += totalTodaySteps;
+      else sum += (stepHistory[dStr] || 0);
+    }
+    return sum;
+  };
+
+  // Determine what to display based on selected Day
+  const selectedDateObj = new Date();
+  selectedDateObj.setDate(selectedDateObj.getDate() + (selectedDayIdx - 2));
+  const selectedDateString = selectedDateObj.toISOString().split('T')[0];
+
+  const isSelectedToday = selectedDayIdx === 2;
+
+  let displaySteps = 0;
+  let displayGoal = 10000;
+
+  if (isSelectedToday) {
+    displaySteps = getPeriodSteps(activeMode);
+    displayGoal = 10000 * (activeMode === 0 ? 1 : activeMode === 1 ? 7 : 30);
+  } else {
+    displaySteps = stepHistory[selectedDateString] || 0;
+    displayGoal = 10000;
+  }
+
+  // Derived metrics
+  const activeDistance = (displaySteps * 0.000762).toFixed(2);
+  const activeMinutes = Math.round(displaySteps / 100);
+  const activeHours = Math.floor(activeMinutes / 60);
+  const activeMins = activeMinutes % 60;
+  const activeTimeStr = `${activeHours}:${activeMins.toString().padStart(2, '0')}`;
+  const activeCaloriesBurned = Math.round(displaySteps * 0.04);
+  const heartRate = 92; // Mock heart rate
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* ── Header ── */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={[styles.headerDate, { color: theme.textMuted }]}>
+                {selectedDateObj.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+              <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{t.dailyActivity}</Text>
+            </View>
+            <View style={[styles.avatar, { backgroundColor: theme.pillBackground }]}>
+              <Text style={styles.avatarText}>
+                {userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* ── Week Day Selector ── */}
+        <Animated.View entering={FadeInDown.duration(400).delay(60)} style={styles.weekRow}>
+          {weekDays.map((d, i) => (
+            <TouchableOpacity
+              key={i}
+              onPress={() => setSelectedDayIdx(i)}
+              style={[
+                styles.dayBtn,
+                { borderColor: theme.cardBorder, backgroundColor: theme.cardBackground },
+                selectedDayIdx === i && styles.dayBtnActive,
+              ]}
+            >
+              <Text style={[styles.dayName, { color: theme.textMuted }, selectedDayIdx === i && styles.dayNameActive]}>
+                {d.day}
+              </Text>
+              <Text style={[styles.dayDate, { color: theme.textPrimary }, selectedDayIdx === i && styles.dayDateActive]}>
+                {d.date}
+              </Text>
             </TouchableOpacity>
+          ))}
+        </Animated.View>
+
+        {/* ── Step Ring Card ── */}
+        <Animated.View
+          entering={FadeInDown.duration(400).delay(120)}
+          style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+        >
+          <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+            <StepRing steps={displaySteps} goal={displayGoal} isDark={isDark} t={t} />
           </View>
 
-          {/* Filter Tags */}
-          <View style={styles.tagsContainer}>
-            {['pasta', 'chicken', 'vegetables', 'seafood'].map((cat) => (
+          {/* ── 2 stats below ring ── */}
+          <View style={[styles.statsRow, { borderTopColor: theme.cardBorder }]}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.distance}</Text>
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{activeDistance} <Text style={styles.statUnit}>{t.km}</Text></Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: theme.cardBorder }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.caloriesBurned}</Text>
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{activeCaloriesBurned} <Text style={styles.statUnit}>{t.kcal}</Text></Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* ── Activity Mode Tabs (Only visible when Today is selected) ── */}
+        {isSelectedToday && (
+          <Animated.View entering={FadeInDown.duration(400).delay(180)} style={[styles.modeTabs, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            {modes.map((m, i) => (
               <TouchableOpacity
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
-                style={[
-                  styles.tag,
-                  selectedCategory === cat && styles.tagActive
-                ]}
+                key={i}
+                onPress={() => setActiveMode(i)}
+                style={[styles.modeTab, activeMode === i && styles.modeTabActive]}
               >
-                <Text style={[
-                  styles.tagText,
-                  selectedCategory === cat && styles.tagTextActive
-                ]}>
-                  {cat}
+                <Text style={[styles.modeTabText, { color: theme.textMuted }, activeMode === i && styles.modeTabTextActive]}>
+                  {m}
                 </Text>
               </TouchableOpacity>
             ))}
+          </Animated.View>
+        )}
+
+        {/* ── Route Map Card ── */}
+        <Animated.View
+          entering={FadeInDown.duration(400).delay(240)}
+          style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, overflow: 'hidden', padding: 0 }]}
+        >
+          <RouteMap isDark={isDark} routePoints={routePoints} onPress={() => setIsMapFullScreen(true)} />
+        </Animated.View>
+
+        {/* ── Stats Grid (2×2) ── */}
+        <Animated.View entering={FadeInDown.duration(400).delay(300)} style={styles.gridRow}>
+          {/* Eaten */}
+          <View style={[styles.gridCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <View style={styles.gridIconRow}>
+              <View style={[styles.gridIconBg, { backgroundColor: '#F4C34422' }]}>
+                <Ionicons name="restaurant" size={18} color="#F4C344" />
+              </View>
+            </View>
+            <Text style={[styles.gridLabel, { color: theme.textMuted }]}>{t.caloriesEaten}</Text>
+            <Text style={[styles.gridValue, { color: theme.textPrimary }]}>
+              {isSelectedToday ? caloriesEaten : 0} <Text style={styles.gridUnit}>{t.kcal}</Text>
+            </Text>
           </View>
 
-          {/* Dishes List */}
-          <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-            {filteredDishes.map((dish, index) => (
-              <Animated.View
-                key={dish.id}
-                entering={FadeInDown.duration(500).delay(index * 100)}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => setSelectedDish(dish)}
-                  style={styles.dishCard}
-                >
-                  <Image source={dish.image} style={styles.dishCardImage} />
-                  <View style={styles.dishCardInfo}>
-                    <Text style={styles.dishCardCalories}>{dish.calories} kcal</Text>
-                    <Text style={styles.dishCardName}>{dish.name}</Text>
-                    <Text style={styles.dishCardMacros}>
-                      Fats {dish.fats} • Carbs {dish.carbs} • Prot {dish.protein}
-                    </Text>
-                  </View>
-                  <View style={styles.arrowContainer}>
-                    <Ionicons name="chevron-forward" size={20} color="#7EB93C" />
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </ScrollView>
-        </View>
-      ) : (
-        // DISH DETAIL VIEW (CARBONARA SCREEN)
-        <Animated.View entering={SlideInRight.duration(400)} style={styles.detailView}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => setSelectedDish(null)}
-          >
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.detailScrollContent}>
-            {/* Category / Name Header */}
-            <Text style={styles.detailCategory}>{selectedDish.category.toUpperCase()}</Text>
-            <Text style={styles.detailTitle}>{selectedDish.name}</Text>
-            <Text style={styles.detailDesc}>{selectedDish.description}</Text>
-
-            {/* Food Image and Macro Details Container */}
-            <View style={styles.detailBody}>
-              <View style={styles.detailImageContainer}>
-                <Image source={selectedDish.image} style={styles.detailImage} resizeMode="contain" />
-              </View>
-
-              <View style={styles.detailMacros}>
-                <View style={styles.detailCalContainer}>
-                  <Text style={styles.detailCalLabel}>kcal</Text>
-                  <Text style={styles.detailCalValue}>{selectedDish.calories}</Text>
-                </View>
-
-                {/* Macro Items */}
-                <View style={styles.macroRow}>
-                  <View style={[styles.macroDot, { backgroundColor: '#7EB93C' }]} />
-                  <Text style={styles.macroLabel}>Carbohydrates</Text>
-                  <Text style={styles.macroVal}>{selectedDish.carbs}</Text>
-                </View>
-                <View style={styles.macroRow}>
-                  <View style={[styles.macroDot, { backgroundColor: '#FAD02C' }]} />
-                  <Text style={styles.macroLabel}>Proteins</Text>
-                  <Text style={styles.macroVal}>{selectedDish.protein}</Text>
-                </View>
-                <View style={styles.macroRow}>
-                  <View style={[styles.macroDot, { backgroundColor: '#FF8C42' }]} />
-                  <Text style={styles.macroLabel}>Fats</Text>
-                  <Text style={styles.macroVal}>{selectedDish.fats}</Text>
-                </View>
+          {/* Burned */}
+          <View style={[styles.gridCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <View style={styles.gridIconRow}>
+              <View style={[styles.gridIconBg, { backgroundColor: '#E8A86F22' }]}>
+                <Ionicons name="flame" size={18} color="#E8A86F" />
               </View>
             </View>
-
-            {/* Weight Dial Selector */}
-            <View style={styles.weightSelectorContainer}>
-              <Text style={styles.weightLabel}>Your portion in grams</Text>
-              <View style={styles.dialWrapper}>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.dialScroll}
-                >
-                  {weights.map((w) => {
-                    const isSelected = portionWeight === w;
-                    return (
-                      <TouchableOpacity 
-                        key={w} 
-                        onPress={() => setPortionWeight(w)}
-                        style={styles.dialItem}
-                      >
-                        <Text style={[
-                          styles.dialText,
-                          isSelected && styles.dialTextActive
-                        ]}>
-                          {w}
-                        </Text>
-                        <View style={[
-                          styles.dialTick,
-                          isSelected && styles.dialTickActive
-                        ]} />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </View>
-          </ScrollView>
-
-          {/* Action button */}
-          <View style={styles.bottomBar}>
-            <TouchableOpacity 
-              activeOpacity={0.8}
-              style={styles.doneButton}
-              onPress={handleAddPortion}
-            >
-              <Text style={styles.doneButtonText}>Done</Text>
-            </TouchableOpacity>
+            <Text style={[styles.gridLabel, { color: theme.textMuted }]}>{t.caloriesBurned}</Text>
+            <Text style={[styles.gridValue, { color: theme.textPrimary }]}>
+              {activeCaloriesBurned} <Text style={styles.gridUnit}>{t.kcal}</Text>
+            </Text>
           </View>
         </Animated.View>
-      )}
-    </SafeAreaView>
+
+        <Animated.View entering={FadeInDown.duration(400).delay(360)} style={styles.gridRow}>
+          {/* Steps */}
+          <View style={[styles.gridCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <View style={styles.gridIconRow}>
+              <View style={[styles.gridIconBg, { backgroundColor: '#7EB93C22' }]}>
+                <Ionicons name="footsteps" size={18} color="#7EB93C" />
+              </View>
+            </View>
+            <Text style={[styles.gridLabel, { color: theme.textMuted }]}>{t.steps}</Text>
+            <Text style={[styles.gridValue, { color: theme.textPrimary }]}>
+              {displaySteps.toLocaleString()}
+            </Text>
+          </View>
+
+          {/* Distance */}
+          <View style={[styles.gridCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <View style={styles.gridIconRow}>
+              <View style={[styles.gridIconBg, { backgroundColor: '#A8A4D822' }]}>
+                <Ionicons name="location" size={18} color="#A8A4D8" />
+              </View>
+            </View>
+            <Text style={[styles.gridLabel, { color: theme.textMuted }]}>{t.distanceLabel}</Text>
+            <Text style={[styles.gridValue, { color: theme.textPrimary }]}>
+              {activeDistance} <Text style={styles.gridUnit}>{t.km}</Text>
+            </Text>
+          </View>
+        </Animated.View>
+
+        <View style={{ height: 24 }} />
+      </ScrollView>
+
+      {/* ── Full Screen Interactive Map Modal ── */}
+      <Modal visible={isMapFullScreen} animationType="slide" transparent={false}>
+        <View style={{ flex: 1, backgroundColor: theme.background }}>
+          {routePoints.length > 0 ? (
+            <MapView
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: routePoints[routePoints.length - 1].latitude,
+                longitude: routePoints[routePoints.length - 1].longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              }}
+              userInterfaceStyle={isDark ? "dark" : "light"}
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+            >
+              <Polyline
+                coordinates={routePoints}
+                strokeColor="#7EB93C"
+                strokeWidth={4}
+              />
+              <Marker coordinate={routePoints[0]} title="Start" pinColor="green" />
+              <Marker coordinate={routePoints[routePoints.length - 1]} title="Current" pinColor="blue" />
+            </MapView>
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: theme.textMuted }}>No route data available</Text>
+            </View>
+          )}
+          <View style={{ position: 'absolute', top: Math.max(insets.top + 8, 20), right: 16, zIndex: 10 }}>
+            <TouchableOpacity
+              onPress={() => setIsMapFullScreen(false)}
+              style={{
+                backgroundColor: theme.cardBackground,
+                borderRadius: 20,
+                padding: 8,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5
+              }}
+            >
+              <Ionicons name="close" size={24} color={theme.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+    </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAF3',
   },
-  mainView: {
-    flex: 1,
+  scroll: {
     paddingHorizontal: 16,
-    paddingTop: 15,
+    paddingTop: 12,
+    paddingBottom: 20,
+  },
+
+  // Header
+  header: {
+    marginBottom: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerDate: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#3A5C18',
-    marginBottom: 15,
   },
-  searchBox: {
-    flexDirection: 'row',
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    height: 52,
-    borderWidth: 1.5,
-    borderColor: '#EBF2E5',
   },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
+  avatarText: {
     fontSize: 16,
-    color: '#333',
+    fontWeight: '800',
+    color: '#7EB93C',
   },
-  micButton: {
-    padding: 6,
-  },
-  tagsContainer: {
+
+  // Week days
+  weekRow: {
     flexDirection: 'row',
-    marginVertical: 16,
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 6,
   },
-  tag: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+  dayBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
   },
-  tagActive: {
+  dayBtnActive: {
     backgroundColor: '#7EB93C',
     borderColor: '#7EB93C',
   },
-  tagText: {
-    fontSize: 14,
-    color: '#666',
+  dayName: {
+    fontSize: 10,
     fontWeight: '600',
-  },
-  tagTextActive: {
-    color: '#FFFFFF',
-  },
-  listContent: {
-    paddingBottom: 20,
-  },
-  dishCard: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 16,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#EBF2E5',
-  },
-  dishCardImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginRight: 16,
-  },
-  dishCardInfo: {
-    flex: 1,
-  },
-  dishCardCalories: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7EB93C',
-    marginBottom: 2,
-  },
-  dishCardName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#333333',
     marginBottom: 4,
-  },
-  dishCardMacros: {
-    fontSize: 12,
-    color: '#888',
-  },
-  arrowContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F5FAF0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // DETAIL VIEW STYLES
-  detailView: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  backButton: {
-    padding: 16,
-    alignSelf: 'flex-start',
-  },
-  detailScrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 100,
-  },
-  detailCategory: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7EB93C',
-    letterSpacing: 1,
-  },
-  detailTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1A1A1A',
-    marginTop: 4,
-  },
-  detailDesc: {
-    fontSize: 16,
-    color: '#777777',
-    marginTop: 4,
-    marginBottom: 20,
-  },
-  detailBody: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 30,
-  },
-  detailImageContainer: {
-    width: width * 0.45,
-    height: width * 0.45,
-    borderRadius: (width * 0.45) / 2,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  detailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  detailMacros: {
-    flex: 1,
-    marginLeft: 20,
-  },
-  detailCalContainer: {
-    marginBottom: 15,
-  },
-  detailCalLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#888',
     textTransform: 'uppercase',
   },
-  detailCalValue: {
-    fontSize: 38,
+  dayNameActive: {
+    color: '#FFFFFF',
+  },
+  dayDate: {
+    fontSize: 15,
     fontWeight: '800',
-    color: '#1A1A1A',
-    lineHeight: 42,
   },
-  macroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+  dayDateActive: {
+    color: '#FFFFFF',
   },
-  macroDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  macroLabel: {
-    fontSize: 12,
-    color: '#666',
-    flex: 1,
-  },
-  macroVal: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#333',
-  },
-  weightSelectorContainer: {
-    marginTop: 10,
-  },
-  weightLabel: {
-    fontSize: 14,
-    color: '#888',
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-  dialWrapper: {
-    backgroundColor: '#F5FAF0',
+
+  // Card
+  card: {
     borderRadius: 24,
-    height: 90,
-    justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 3,
   },
-  dialScroll: {
-    paddingHorizontal: 20,
+
+  // Ring stats row
+  statsRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1.5,
+    marginTop: 16,
+    paddingTop: 16,
+  },
+  statItem: {
+    flex: 1,
     alignItems: 'center',
   },
-  dialItem: {
-    alignItems: 'center',
-    width: 60,
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  dialText: {
-    fontSize: 16,
-    color: '#A9A9A9',
+  statValue: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  statUnit: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statDivider: {
+    width: 1.5,
+    height: 40,
+    alignSelf: 'center',
+  },
+
+  // Ring text
+  ringSteps: {
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  ringLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  ringGoal: {
+    fontSize: 11,
     fontWeight: '500',
+    marginTop: 2,
   },
-  dialTextActive: {
-    fontSize: 22,
-    color: '#1C2E0A',
+
+  // Mode tabs
+  modeTabs: {
+    flexDirection: 'row',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 4,
+    marginBottom: 16,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modeTabActive: {
+    backgroundColor: '#7EB93C',
+  },
+  modeTabText: {
+    fontSize: 13,
     fontWeight: '700',
   },
-  dialTick: {
-    width: 2,
-    height: 10,
-    backgroundColor: '#CCD8C0',
-    marginTop: 8,
+  modeTabTextActive: {
+    color: '#FFFFFF',
   },
-  dialTickActive: {
-    backgroundColor: '#7EB93C',
-    height: 18,
-    width: 3,
+
+  // Map
+  mapContainer: {
+    height: 200,
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 22,
   },
-  bottomBar: {
+  roadH: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 25,
-    paddingTop: 15,
-    paddingHorizontal: 24,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1.5,
-    borderTopColor: '#EBF2E5',
+    height: 10,
+    opacity: 0.5,
   },
-  doneButton: {
-    backgroundColor: '#1C2E0A',
-    borderRadius: 30,
-    height: 58,
+  roadV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 10,
+    opacity: 0.5,
+  },
+  mapPin: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  mapPinEnd: {
+    position: 'absolute',
+  },
+
+  // 2×2 stat grid
+  gridRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  gridCard: {
+    flex: 1,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 3,
+  },
+  gridIconRow: {
+    marginBottom: 10,
+  },
+  gridIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  doneButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
+  gridLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  gridValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  gridUnit: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

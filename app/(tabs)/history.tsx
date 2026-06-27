@@ -1,129 +1,303 @@
-import React, { useState } from 'react';
+import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
 import {
+  ScrollView,
   StyleSheet,
   Text,
-  View,
-  ScrollView,
   TouchableOpacity,
-  SafeAreaView,
-  Dimensions,
+  useColorScheme,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
+const translations = {
+  en: {
+    historyTitle: 'History',
+    thisWeek: 'This week',
+    underGoal: 'Under goal',
+    overGoal: 'Over goal',
+    today: 'Today',
+    dayStreak: 'Day streak',
+    avgKcal: 'Avg kcal / day',
+    goalDays: 'Goal days',
+    dailyLog: 'Daily Log',
+    breakfast: 'Breakfast',
+    lunch: 'Lunch',
+    dinner: 'Dinner',
+    snack: 'Snack',
+    other: 'Other',
+    sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat',
+    todayLabel: 'Today, ',
+    yesterdayLabel: 'Yesterday, '
+  },
+  ru: {
+    historyTitle: 'История',
+    thisWeek: 'На этой неделе',
+    underGoal: 'Ниже цели',
+    overGoal: 'Выше цели',
+    today: 'Сегодня',
+    dayStreak: 'Серия дней',
+    avgKcal: 'Среднее ккал / день',
+    goalDays: 'Дни цели',
+    dailyLog: 'Ежедневный лог',
+    breakfast: 'Завтрак',
+    lunch: 'Обед',
+    dinner: 'Ужин',
+    snack: 'Перекус',
+    other: 'Другое',
+    sun: 'Вс', mon: 'Пн', tue: 'Вт', wed: 'Ср', thu: 'Чт', fri: 'Пт', sat: 'Сб',
+    todayLabel: 'Сегодня, ',
+    yesterdayLabel: 'Вчера, '
+  },
+  uz: {
+    historyTitle: 'Tarix',
+    thisWeek: 'Shu hafta',
+    underGoal: 'Maqsaddan kam',
+    overGoal: 'Maqsaddan ko\'p',
+    today: 'Bugun',
+    dayStreak: 'Kunlik seriya',
+    avgKcal: 'O\'rtacha kkal / kun',
+    goalDays: 'Maqsadli kunlar',
+    dailyLog: 'Kunlik jurnal',
+    breakfast: 'Nonushta',
+    lunch: 'Tushlik',
+    dinner: 'Kechki ovqat',
+    snack: 'Tamaddi',
+    other: 'Boshqa',
+    sun: 'Yak', mon: 'Dush', tue: 'Sesh', wed: 'Chor', thu: 'Pay', fri: 'Jum', sat: 'Shan',
+    todayLabel: 'Bugun, ',
+    yesterdayLabel: 'Kecha, '
+  }
+};
 
-const HISTORY_DATA = [
-  {
-    date: 'Today, June 11',
-    isToday: true,
-    totalCalories: 864,
-    goalCalories: 900,
-    meals: [
-      { name: 'Breakfast', food: 'Oatmeal with fruits and nuts', calories: 480, icon: '🥣' },
-      { name: 'Lunch', food: 'Chops with potatoes', calories: 384, icon: '🍗' },
-    ],
-  },
-  {
-    date: 'Yesterday, June 10',
-    isToday: false,
-    totalCalories: 920,
-    goalCalories: 900,
-    meals: [
-      { name: 'Breakfast', food: 'Scrambled eggs & toast', calories: 340, icon: '🍳' },
-      { name: 'Lunch', food: 'Carbonara pasta', calories: 384, icon: '🍝' },
-      { name: 'Dinner', food: 'Grilled salmon salad', calories: 196, icon: '🥗' },
-    ],
-  },
-  {
-    date: 'June 9',
-    isToday: false,
-    totalCalories: 785,
-    goalCalories: 900,
-    meals: [
-      { name: 'Breakfast', food: 'Yogurt with granola', calories: 210, icon: '🥛' },
-      { name: 'Lunch', food: 'Chicken rice bowl', calories: 440, icon: '🍚' },
-      { name: 'Other', food: 'Protein bar', calories: 135, icon: '🍫' },
-    ],
-  },
-  {
-    date: 'June 8',
-    isToday: false,
-    totalCalories: 1050,
-    goalCalories: 900,
-    meals: [
-      { name: 'Breakfast', food: 'Avocado toast', calories: 310, icon: '🥑' },
-      { name: 'Lunch', food: 'Milano pasta', calories: 401, icon: '🍝' },
-      { name: 'Dinner', food: 'Vegetable stir fry', calories: 339, icon: '🥦' },
-    ],
-  },
-  {
-    date: 'June 7',
-    isToday: false,
-    totalCalories: 720,
-    goalCalories: 900,
-    meals: [
-      { name: 'Breakfast', food: 'Smoothie bowl', calories: 280, icon: '🍓' },
-      { name: 'Lunch', food: 'Caesar salad', calories: 310, icon: '🥗' },
-      { name: 'Other', food: 'Apple', calories: 130, icon: '🍎' },
-    ],
-  },
-];
+type MealItem = {
+  name: string;
+  food: string;
+  calories: number;
+  icon: string;
+};
 
-const WEEK_CALORIES = [720, 1050, 785, 920, 864, 0, 0];
-const WEEK_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const GOAL = 900;
+type DayHistory = {
+  dateObj: Date;
+  dateStr: string;
+  displayDate: string;
+  isToday: boolean;
+  totalCalories: number;
+  goalCalories: number;
+  meals: MealItem[];
+};
 
 export default function HistoryScreen() {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+  const [appTheme, setAppTheme] = useState(MockStore.appTheme);
+  const [language, setLanguage] = useState(MockStore.language);
+  const [dailyCalorieGoal, setDailyCalorieGoal] = useState(MockStore.dailyCalorieGoal || 1900);
+  
+  const [userId, setUserId] = useState<string | null>(null);
+  const [historyData, setHistoryData] = useState<DayHistory[]>([]);
+  const [weekCalories, setWeekCalories] = useState<number[]>([]);
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    return MockStore.subscribe(() => {
+      setAppTheme(MockStore.appTheme);
+      setLanguage(MockStore.language);
+      setDailyCalorieGoal(MockStore.dailyCalorieGoal);
+    });
+  }, []);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) setUserId(data.user.id);
+    };
+    getUser();
+  }, []);
+
+  const t = translations[language as keyof typeof translations] || translations.en;
+
+  const loadHistoryFromDB = async () => {
+    if (!userId) return;
+
+    // Build the last 7 days array
+    const last7Days: string[] = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      last7Days.push(d.toISOString().split('T')[0]);
+    }
+
+    const { data, error } = await supabase
+      .from('diary_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .in('date', last7Days)
+      .neq('meal_type', 'steps_history'); // exclude pedometer syncs
+
+    if (error) {
+      console.error('Error fetching history:', error);
+      return;
+    }
+
+    // Process data into grouped format
+    const grouped: Record<string, DayHistory> = {};
+    
+    last7Days.forEach((dateStr, i) => {
+      const d = new Date(dateStr);
+      let displayDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (i === 0) displayDate = t.todayLabel + displayDate;
+      else if (i === 1) displayDate = t.yesterdayLabel + displayDate;
+
+      grouped[dateStr] = {
+        dateObj: d,
+        dateStr: dateStr,
+        displayDate,
+        isToday: i === 0,
+        totalCalories: 0,
+        goalCalories: dailyCalorieGoal,
+        meals: [],
+      };
+    });
+
+    if (data) {
+      data.forEach((entry: any) => {
+        const day = grouped[entry.date];
+        if (day) {
+          day.totalCalories += (entry.calories || 0);
+          
+          let icon = '🍽️';
+          if (entry.meal_type === 'breakfast') icon = '🍳';
+          if (entry.meal_type === 'lunch') icon = '🥗';
+          if (entry.meal_type === 'dinner') icon = '🥩';
+          if (entry.meal_type === 'snack') icon = '🍎';
+
+          let itemsDesc = '';
+          if (typeof entry.items === 'string') {
+            try {
+              const parsed = JSON.parse(entry.items);
+              itemsDesc = parsed.map((it: any) => it.name).join(', ');
+            } catch (e) {}
+          }
+
+          if (entry.calories > 0 || itemsDesc !== '') {
+            day.meals.push({
+              name: t[entry.meal_type as keyof typeof t] || entry.meal_type,
+              food: itemsDesc || 'Added calories',
+              calories: entry.calories,
+              icon
+            });
+          }
+        }
+      });
+    }
+
+    const sortedData = last7Days.map(d => grouped[d]);
+    setHistoryData(sortedData);
+
+    // weekCalories for chart (Sun to Sat ordering)
+    const weekCals = [0,0,0,0,0,0,0];
+    sortedData.forEach(d => {
+      const dayOfWeek = d.dateObj.getDay(); // 0 (Sun) to 6 (Sat)
+      weekCals[dayOfWeek] = d.totalCalories;
+    });
+    setWeekCalories(weekCals);
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadHistoryFromDB();
+    }, [userId, dailyCalorieGoal, language])
+  );
+
+  const systemColorScheme = useColorScheme();
+  const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
+
+  const theme = {
+    background: isDark ? '#0F140A' : '#F7FAF3',
+    cardBackground: isDark ? '#171E10' : '#FFFFFF',
+    cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A2310',
+    textBrand: isDark ? '#8CC33F' : '#3A5C18',
+    textMuted: isDark ? '#9AA88E' : '#6B785E',
+    barTrackBg: isDark ? '#1D2814' : '#F0F4EC',
+    statCardBg: isDark ? '#171E10' : '#FFFFFF',
+    dayCardTodayBg: isDark ? '#1A2A12' : '#FAFEF6',
+    dayCardTodayBorder: isDark ? '#8CC33F' : '#7EB93C',
+    dividerColor: isDark ? '#2A3A1E' : '#F0F4EC',
+    badgeOkBg: isDark ? '#23321A' : '#F0FAE4',
+    badgeOverBg: isDark ? '#3D2214' : '#FFF2EA',
+    badgeOverText: isDark ? '#FF9E66' : '#FF8C42',
+  };
 
   const toggleExpand = (i: number) => {
     setExpandedIndex(expandedIndex === i ? null : i);
   };
 
+  const weekLabelsMapped = [t.sun, t.mon, t.tue, t.wed, t.thu, t.fri, t.sat];
+  const todayIndex = new Date().getDay();
+
+  // Calculate streaks & averages
+  const validDays = historyData.filter(d => d.totalCalories > 0);
+  const avgKcal = validDays.length ? Math.round(validDays.reduce((sum, d) => sum + d.totalCalories, 0) / validDays.length) : 0;
+  const goalDaysCount = validDays.filter(d => d.totalCalories <= d.goalCalories).length;
+  
+  let currentStreak = 0;
+  for (let i = 0; i < historyData.length; i++) {
+    if (historyData[i].totalCalories > 0 && historyData[i].totalCalories <= historyData[i].goalCalories) {
+      currentStreak++;
+    } else if (i !== 0 || historyData[0].totalCalories > 0) {
+      break;
+    }
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)}>
-          <Text style={styles.pageTitle}>History</Text>
+          <Text style={[styles.pageTitle, { color: theme.textBrand }]}>{t.historyTitle}</Text>
         </Animated.View>
 
         {/* Weekly Summary Chart */}
-        <Animated.View entering={FadeInDown.duration(500).delay(80)} style={styles.chartCard}>
-          <Text style={styles.chartTitle}>This week</Text>
+        <Animated.View entering={FadeInDown.duration(500).delay(80)} style={[styles.chartCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+          <Text style={[styles.chartTitle, { color: theme.textMuted }]}>{t.thisWeek}</Text>
           <View style={styles.barsContainer}>
-            {WEEK_CALORIES.map((cal, i) => {
+            {weekCalories.map((cal, i) => {
               const hasData = cal > 0;
-              const heightPct = hasData ? Math.min(cal / GOAL, 1.2) : 0;
-              const isOver = cal > GOAL;
-              const isToday = i === 4;
+              const heightPct = hasData ? Math.min(cal / dailyCalorieGoal, 1.2) : 0;
+              const isOver = cal > dailyCalorieGoal;
+              const isToday = i === todayIndex;
               return (
                 <View key={i} style={styles.barCol}>
                   {hasData && (
                     <Text style={styles.barCalLabel}>{cal}</Text>
                   )}
-                  <View style={styles.barTrack}>
+                  <View style={[styles.barTrack, { backgroundColor: theme.barTrackBg }]}>
                     {/* Goal line marker */}
-                    <View style={styles.goalLine} />
+                    <View style={[styles.goalLine, { backgroundColor: isDark ? '#374B2A' : '#C8E8A0' }]} />
                     {hasData && (
                       <View
                         style={[
                           styles.barFill,
                           {
                             height: `${Math.min(heightPct * 100, 110)}%`,
-                            backgroundColor: isOver ? '#FF8C42' : isToday ? '#3A5C18' : '#7EB93C',
+                            backgroundColor: isOver ? '#FF8C42' : isToday ? theme.textBrand : '#7EB93C',
                           },
                         ]}
                       />
                     )}
                   </View>
-                  <Text style={[styles.barDayLabel, isToday && styles.barDayLabelActive]}>
-                    {WEEK_LABELS[i]}
+                  <Text style={[styles.barDayLabel, { color: theme.textMuted }, isToday && [styles.barDayLabelActive, { color: theme.textBrand }]]}>
+                    {weekLabelsMapped[i]}
                   </Text>
                 </View>
               );
@@ -133,44 +307,44 @@ export default function HistoryScreen() {
           <View style={styles.legend}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#7EB93C' }]} />
-              <Text style={styles.legendText}>Under goal</Text>
+              <Text style={[styles.legendText, { color: theme.textMuted }]}>{t.underGoal}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#FF8C42' }]} />
-              <Text style={styles.legendText}>Over goal</Text>
+              <Text style={[styles.legendText, { color: theme.textMuted }]}>{t.overGoal}</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#3A5C18' }]} />
-              <Text style={styles.legendText}>Today</Text>
+              <View style={[styles.legendDot, { backgroundColor: isDark ? '#8CC33F' : '#3A5C18' }]} />
+              <Text style={[styles.legendText, { color: theme.textMuted }]}>{t.today}</Text>
             </View>
           </View>
         </Animated.View>
 
         {/* Avg + Streak Stats */}
         <Animated.View entering={FadeInDown.duration(500).delay(150)} style={styles.statsRow}>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: theme.statCardBg, borderColor: theme.cardBorder }]}>
             <Ionicons name="flame" size={22} color="#FF8C42" />
-            <Text style={styles.statValue}>5</Text>
-            <Text style={styles.statLabel}>Day streak</Text>
+            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{currentStreak}</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.dayStreak}</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: theme.statCardBg, borderColor: theme.cardBorder }]}>
             <Ionicons name="bar-chart" size={22} color="#7EB93C" />
-            <Text style={styles.statValue}>868</Text>
-            <Text style={styles.statLabel}>Avg kcal / day</Text>
+            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{avgKcal}</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.avgKcal}</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: theme.statCardBg, borderColor: theme.cardBorder }]}>
             <Ionicons name="trophy" size={22} color="#F4C344" />
-            <Text style={styles.statValue}>3/5</Text>
-            <Text style={styles.statLabel}>Goal days</Text>
+            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{goalDaysCount}/{validDays.length || 1}</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.goalDays}</Text>
           </View>
         </Animated.View>
 
         {/* Day-by-Day Log */}
-        <Text style={styles.sectionTitle}>Daily Log</Text>
+        <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.dailyLog}</Text>
 
-        {HISTORY_DATA.map((day, i) => {
+        {historyData.map((day, i) => {
           const isExpanded = expandedIndex === i;
-          const pct = Math.min((day.totalCalories / day.goalCalories) * 100, 100);
+          const pct = day.goalCalories > 0 ? Math.min((day.totalCalories / day.goalCalories) * 100, 100) : 0;
           const isOver = day.totalCalories > day.goalCalories;
 
           return (
@@ -181,42 +355,46 @@ export default function HistoryScreen() {
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={() => toggleExpand(i)}
-                style={[styles.dayCard, day.isToday && styles.dayCardToday]}
+                style={[
+                  styles.dayCard, 
+                  { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder },
+                  day.isToday && [styles.dayCardToday, { backgroundColor: theme.dayCardTodayBg, borderColor: theme.dayCardTodayBorder }]
+                ]}
               >
                 {/* Day Header row */}
                 <View style={styles.dayHeader}>
                   <View>
-                    <Text style={[styles.dayDate, day.isToday && styles.dayDateToday]}>
-                      {day.date}
+                    <Text style={[styles.dayDate, { color: theme.textMuted }, day.isToday && [styles.dayDateToday, { color: theme.textBrand }]]}>
+                      {day.displayDate}
                     </Text>
                     <View style={styles.dayCalRow}>
-                      <Text style={[styles.dayCalValue, isOver && { color: '#FF8C42' }]}>
+                      <Text style={[styles.dayCalValue, { color: theme.textPrimary }, isOver && { color: theme.badgeOverText }]}>
                         {day.totalCalories} kcal
                       </Text>
-                      <Text style={styles.dayCalGoal}> / {day.goalCalories}</Text>
+                      <Text style={[styles.dayCalGoal, { color: theme.textMuted }]}> / {day.goalCalories}</Text>
                     </View>
                   </View>
                   <View style={styles.dayRight}>
                     {isOver ? (
-                      <View style={styles.overBadge}>
-                        <Text style={styles.overBadgeText}>+{day.totalCalories - day.goalCalories}</Text>
+                      <View style={[styles.overBadge, { backgroundColor: theme.badgeOverBg }]}>
+                        <Text style={[styles.overBadgeText, { color: theme.badgeOverText }]}>+{(day.totalCalories - day.goalCalories).toFixed(0)}</Text>
                       </View>
                     ) : (
-                      <View style={styles.okBadge}>
+                      <View style={[styles.okBadge, { backgroundColor: theme.badgeOkBg }]}>
                         <Ionicons name="checkmark" size={14} color="#7EB93C" />
                       </View>
                     )}
                     <Ionicons
                       name={isExpanded ? 'chevron-up' : 'chevron-down'}
                       size={18}
-                      color="#AAA"
+                      color={theme.textMuted}
                       style={{ marginLeft: 8 }}
                     />
                   </View>
                 </View>
 
                 {/* Mini progress bar */}
-                <View style={styles.miniBarBg}>
+                <View style={[styles.miniBarBg, { backgroundColor: theme.cardBorder }]}>
                   <View
                     style={[
                       styles.miniBarFill,
@@ -229,18 +407,23 @@ export default function HistoryScreen() {
                 </View>
 
                 {/* Expanded Meal List */}
-                {isExpanded && (
+                {isExpanded && day.meals.length > 0 && (
                   <View style={styles.mealList}>
                     {day.meals.map((meal, mi) => (
-                      <View key={mi} style={styles.mealRow}>
+                      <View key={mi} style={[styles.mealRow, { borderTopColor: theme.dividerColor }]}>
                         <Text style={styles.mealEmoji}>{meal.icon}</Text>
                         <View style={styles.mealInfo}>
-                          <Text style={styles.mealName}>{meal.name}</Text>
-                          <Text style={styles.mealFood}>{meal.food}</Text>
+                          <Text style={[styles.mealName, { color: theme.textBrand }]}>{meal.name}</Text>
+                          <Text style={[styles.mealFood, { color: theme.textMuted }]}>{meal.food}</Text>
                         </View>
-                        <Text style={styles.mealCal}>{meal.calories} kcal</Text>
+                        <Text style={[styles.mealCal, { color: theme.textBrand }]}>{meal.calories} kcal</Text>
                       </View>
                     ))}
+                  </View>
+                )}
+                {isExpanded && day.meals.length === 0 && (
+                  <View style={styles.mealList}>
+                    <Text style={{color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: 10}}>No meals logged.</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -248,38 +431,33 @@ export default function HistoryScreen() {
           );
         })}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7FAF3',
   },
   scroll: {
     paddingHorizontal: 16,
     paddingTop: 15,
-    paddingBottom: 40,
+    paddingBottom: 80,
   },
   pageTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#3A5C18',
     marginBottom: 16,
   },
   chartCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
   },
   chartTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#888',
     marginBottom: 16,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
@@ -304,7 +482,6 @@ const styles = StyleSheet.create({
   barTrack: {
     width: 22,
     height: 90,
-    backgroundColor: '#F0F4EC',
     borderRadius: 12,
     overflow: 'hidden',
     justifyContent: 'flex-end',
@@ -314,7 +491,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     height: 1.5,
-    backgroundColor: '#C8E8A0',
     bottom: '75%',
     zIndex: 1,
   },
@@ -324,12 +500,10 @@ const styles = StyleSheet.create({
   },
   barDayLabel: {
     fontSize: 11,
-    color: '#AAA',
     marginTop: 6,
     fontWeight: '500',
   },
   barDayLabelActive: {
-    color: '#3A5C18',
     fontWeight: '800',
   },
   legend: {
@@ -350,7 +524,6 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 11,
-    color: '#888',
     fontWeight: '500',
   },
   statsRow: {
@@ -360,42 +533,34 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',
     gap: 4,
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
   },
   statValue: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#2A2A2A',
   },
   statLabel: {
     fontSize: 11,
-    color: '#999',
     textAlign: 'center',
     fontWeight: '500',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#3A5C18',
     marginBottom: 12,
   },
   dayCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 18,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: '#EBF2E5',
   },
   dayCardToday: {
-    borderColor: '#7EB93C',
-    backgroundColor: '#FAFEF6',
+    borderWidth: 1.5,
   },
   dayHeader: {
     flexDirection: 'row',
@@ -406,11 +571,9 @@ const styles = StyleSheet.create({
   dayDate: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#888',
     marginBottom: 4,
   },
   dayDateToday: {
-    color: '#7EB93C',
     fontWeight: '700',
   },
   dayCalRow: {
@@ -420,11 +583,9 @@ const styles = StyleSheet.create({
   dayCalValue: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#2A2A2A',
   },
   dayCalGoal: {
     fontSize: 13,
-    color: '#AAA',
   },
   dayRight: {
     flexDirection: 'row',
@@ -434,7 +595,6 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#F0FAE4',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -442,17 +602,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 12,
-    backgroundColor: '#FFF2EA',
   },
   overBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FF8C42',
   },
   miniBarBg: {
     width: '100%',
     height: 6,
-    backgroundColor: '#EBF2E5',
     borderRadius: 6,
     overflow: 'hidden',
   },
@@ -470,7 +627,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 4,
     borderTopWidth: 1,
-    borderTopColor: '#F0F4EC',
     paddingTop: 10,
   },
   mealEmoji: {
@@ -482,16 +638,13 @@ const styles = StyleSheet.create({
   mealName: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#3A5C18',
   },
   mealFood: {
     fontSize: 12,
-    color: '#888',
     marginTop: 2,
   },
   mealCal: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#7EB93C',
   },
 });

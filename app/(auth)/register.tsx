@@ -12,11 +12,14 @@ import {
   Dimensions,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '@/constants/supabase';
+import { MockStore } from '@/constants/store';
 
 const { height, width } = Dimensions.get('window');
 
@@ -38,12 +41,15 @@ export default function RegisterScreen() {
   const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]); // Default to Uzbekistan
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
+    if (loading) return;
+    
     let isValid = true;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const cleanPhone = phone.replace(/[^0-9]/g, '');
@@ -82,8 +88,11 @@ export default function RegisterScreen() {
     }
 
     if (isValid) {
-      // Navigate to the main tabs app
-      router.replace('/(tabs)');
+      const fullPhone = selectedCountry.code + cleanPhone;
+      router.push({
+        pathname: '/(auth)/register-details',
+        params: { email: email.trim(), password: password.trim(), phone: fullPhone }
+      });
     }
   };
 
@@ -204,13 +213,17 @@ export default function RegisterScreen() {
                 {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
               </View>
 
-              {/* Next Step Button (Styled with green border and green text as in screenshot) */}
               <TouchableOpacity 
                 activeOpacity={0.8} 
-                style={styles.nextButton}
+                style={[styles.nextButton, loading && { opacity: 0.7 }]}
                 onPress={handleRegister}
+                disabled={loading}
               >
-                <Text style={styles.nextButtonText}>Next step</Text>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#7EB93C" />
+                ) : (
+                  <Text style={styles.nextButtonText}>Next step</Text>
+                )}
               </TouchableOpacity>
 
               {/* Toggle to Login */}
