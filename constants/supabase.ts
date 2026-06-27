@@ -7,19 +7,28 @@ const supabaseAnonKey = 'sb_publishable_ASKN0HThv-CsS93iOrljWA___wQ7u8j';
 
 const customStorage = {
   getItem: (key: string) => {
-    if (Platform.OS === 'web' && typeof window === 'undefined') {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return Promise.resolve(window.localStorage.getItem(key));
+      }
       return Promise.resolve(null);
     }
     return AsyncStorage.getItem(key);
   },
   setItem: (key: string, value: string) => {
-    if (Platform.OS === 'web' && typeof window === 'undefined') {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      }
       return Promise.resolve();
     }
     return AsyncStorage.setItem(key, value);
   },
   removeItem: (key: string) => {
-    if (Platform.OS === 'web' && typeof window === 'undefined') {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
       return Promise.resolve();
     }
     return AsyncStorage.removeItem(key);

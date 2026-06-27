@@ -252,9 +252,11 @@ const RouteMap = ({ isDark, routePoints, onPress }: { isDark: boolean; routePoin
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function PedometerScreen() {
+  const router = useRouter();
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
-  const [userName] = useState(MockStore.name);
+  const [userName, setUserName] = useState(MockStore.name);
+  const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
   const [userId, setUserId] = useState<string | null>(null);
 
   const [stepHistory, setStepHistory] = useState<Record<string, number>>({});
@@ -273,6 +275,8 @@ export default function PedometerScreen() {
     return MockStore.subscribe(() => {
       setAppTheme(MockStore.appTheme);
       setLanguage(MockStore.language);
+      setProfileImage(MockStore.profileImage);
+      setUserName(MockStore.name);
     });
   }, []);
 
@@ -631,11 +635,20 @@ export default function PedometerScreen() {
               </Text>
               <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{t.dailyActivity}</Text>
             </View>
-            <View style={[styles.avatar, { backgroundColor: theme.pillBackground }]}>
-              <Text style={styles.avatarText}>
-                {userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-              </Text>
-            </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/profile')}
+            >
+              <View style={[styles.avatar, { backgroundColor: theme.pillBackground }]}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                ) : (
+                  <Text style={styles.avatarText}>
+                    {userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
         </Animated.View>
 

@@ -1,15 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  TextInput,
   Alert,
   Dimensions,
-  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  useColorScheme,
+  View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -17,14 +26,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Calendar } from 'react-native-calendars';
-import Animated, { FadeInDown, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing, interpolate } from 'react-native-reanimated';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import Animated, { Easing, FadeInDown, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
-import { MockStore } from '@/constants/store';
-import { supabase } from '@/constants/supabase';
 
 const translations = {
   en: {
@@ -162,9 +167,9 @@ const DIARY_MEALS = [
 ];
 
 const DEFAULT_DAILY_GOAL = 2000;
-const DEFAULT_CARBS_GOAL  = 250; // (2000 * 0.5) / 4
+const DEFAULT_CARBS_GOAL = 250; // (2000 * 0.5) / 4
 const DEFAULT_PROTEIN_GOAL = 150; // (2000 * 0.3) / 4
-const DEFAULT_FATS_GOAL   = 44; // (2000 * 0.2) / 9
+const DEFAULT_FATS_GOAL = 44; // (2000 * 0.2) / 9
 
 const TRENDS_DATA = {
   day: {
@@ -255,7 +260,7 @@ const MacroRing = ({ percentage, color, unfilledColor, children }: any) => {
     <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
       {/* Base background ring */}
       <View style={{ position: 'absolute', width: size, height: size, borderRadius: radius, borderWidth: stroke, borderColor: unfilledColor }} />
-      
+
       {/* Right half container */}
       <View style={{ position: 'absolute', width: radius, height: size, right: 0, overflow: 'hidden' }}>
         <View style={{
@@ -338,7 +343,36 @@ const analyzeFoodWithAI = async (base64Image: string) => {
         {
           role: "user",
           content: [
-            { type: "text", text: "Analyze this food image. Provide exact estimated calories, carbs, protein, and fat. Return ONLY a JSON object in this format (no markdown formatting): { \"title\": \"Name of dish\", \"subtitle\": \"Short desc\", \"serving\": 1, \"calories\": 400, \"macros\": { \"carbs\": 20, \"protein\": 10, \"fat\": 15 }, \"ingredients\": [ { \"name\": \"Ingredient\", \"weight\": \"100g\", \"calories\": 200, \"carbs\": 10, \"protein\": 5, \"fat\": 10 } ] } If there are multiple ingredients, list them. Ensure all macros numbers are integers. IMPORTANT: If there is no food in the image, or the image is of too poor quality to identify any food, return ONLY this JSON object: { \"error\": \"not_food\" }" },
+            {
+              type: "text",
+              text: "You are an AI food calorie analyzer. Your primary goal is to identify real food items from images and estimate their calories as accurately as possible.\n\n" +
+                    "Rules:\n" +
+                    "1. First, determine whether the image contains real, edible food.\n" +
+                    "2. If you are reasonably confident (70% or higher) that the image shows real food, or if the image is uncertain but appears to contain food, analyze it and make your best estimate instead of rejecting it.\n" +
+                    "3. Do NOT reject an image simply because of poor lighting, homemade appearance, low image quality, partial visibility, or if the food is in a bowl/plate/open packaging.\n" +
+                    "4. Reject the image ONLY if you are highly confident it does NOT contain real food, such as drawings, illustrations, paintings, 3D renders, video game screenshots, toys, plastic food, empty scenes, people without visible food, animals, furniture, or non-food objects.\n" +
+                    "5. Never hallucinate food that is clearly absent.\n" +
+                    "6. If multiple foods are present, identify each separately, estimate for each, and sum them in the total.\n" +
+                    "7. If confidence is low, state that the estimate is approximate (e.g. in the subtitle) rather than refusing to analyze.\n\n" +
+                    "Output Format:\n" +
+                    "You must return ONLY a JSON object in this format (no markdown formatting):\n" +
+                    "If Food Detected is Yes:\n" +
+                    "{\n" +
+                    "  \"title\": \"Name of the dish(es) found\",\n" +
+                    "  \"subtitle\": \"Portion size / description (indicate if approximate if confidence is low)\",\n" +
+                    "  \"serving\": 1,\n" +
+                    "  \"calories\": 450,\n" +
+                    "  \"macros\": { \"carbs\": 40, \"protein\": 20, \"fat\": 15 },\n" +
+                    "  \"ingredients\": [\n" +
+                    "    { \"name\": \"Ingredient / component name\", \"weight\": \"100g\", \"calories\": 200, \"carbs\": 20, \"protein\": 10, \"fat\": 8 }\n" +
+                    "  ]\n" +
+                    "}\n" +
+                    "If Food Detected is No (rejected as non-food with high confidence):\n" +
+                    "{\n" +
+                    "  \"error\": \"not_food\",\n" +
+                    "  \"reason\": \"Explain why the image does not appear to contain real edible food with high confidence\"\n" +
+                    "}"
+            },
             {
               type: "image_url",
               image_url: {
@@ -363,14 +397,15 @@ const analyzeFoodWithAI = async (base64Image: string) => {
 
 export default function DiaryScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+q  const insets = useSafeAreaInsets();
   
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
   const [dailyGoal, setDailyGoal] = useState(MockStore.dailyCalorieGoal);
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
   const [userName, setUserName] = useState(MockStore.name);
-  
+  const insets = useSafeAreaInsets();
+
   useEffect(() => {
     return MockStore.subscribe(() => {
       setAppTheme(MockStore.appTheme);
@@ -416,14 +451,14 @@ export default function DiaryScreen() {
   }, []);
 
   // Macro goals (from profiles table)
-  const [carbsGoal,   setCarbsGoal]   = useState(DEFAULT_CARBS_GOAL);
+  const [carbsGoal, setCarbsGoal] = useState(DEFAULT_CARBS_GOAL);
   const [proteinGoal, setProteinGoal] = useState(DEFAULT_PROTEIN_GOAL);
-  const [fatGoal,     setFatGoal]     = useState(DEFAULT_FATS_GOAL);
+  const [fatGoal, setFatGoal] = useState(DEFAULT_FATS_GOAL);
 
   // Macro totals for the selected day (summed across all meals)
-  const [totalCarbs,   setTotalCarbs]   = useState(0);
+  const [totalCarbs, setTotalCarbs] = useState(0);
   const [totalProtein, setTotalProtein] = useState(0);
-  const [totalFat,     setTotalFat]     = useState(0);
+  const [totalFat, setTotalFat] = useState(0);
 
   // Fetch profile data (name, calorie goal) from profiles when userId is known
   useEffect(() => {
@@ -434,14 +469,14 @@ export default function DiaryScreen() {
         .select('name, daily_calorie_goal')
         .eq('id', userId)
         .single();
-        
+
       if (data) {
         let storeUpdates: any = {};
-        
+
         if (data.name) {
           storeUpdates.name = data.name;
         }
-        
+
         if (data.daily_calorie_goal) {
           const goal = data.daily_calorie_goal;
           storeUpdates.dailyCalorieGoal = goal;
@@ -485,9 +520,9 @@ export default function DiaryScreen() {
             return {
               ...emptyMeal,
               calories: found.calories || 0,
-              carbs:    found.carbs    || 0,
-              protein:  found.protein  || 0,
-              fat:      found.fat      || 0,
+              carbs: found.carbs || 0,
+              protein: found.protein || 0,
+              fat: found.fat || 0,
               items: items,
               empty: items.length === 0 && (found.calories || 0) === 0
             };
@@ -496,9 +531,9 @@ export default function DiaryScreen() {
         });
         setMeals(updatedMeals);
         // Recalculate daily macro totals
-        setTotalCarbs(updatedMeals.reduce((s: number, m: any) => s + (m.carbs   || 0), 0));
+        setTotalCarbs(updatedMeals.reduce((s: number, m: any) => s + (m.carbs || 0), 0));
         setTotalProtein(updatedMeals.reduce((s: number, m: any) => s + (m.protein || 0), 0));
-        setTotalFat(updatedMeals.reduce((s: number, m: any) => s + (m.fat     || 0), 0));
+        setTotalFat(updatedMeals.reduce((s: number, m: any) => s + (m.fat || 0), 0));
       } else {
         setMeals(baseMeals);
         setTotalCarbs(0); setTotalProtein(0); setTotalFat(0);
@@ -519,12 +554,12 @@ export default function DiaryScreen() {
     if (!userId) return;
     setIsFetching(true);
     const fetchAll = async () => {
-      // Fake delay to ensure a smooth, visible loading screen during tab/date switch
-      await new Promise(res => setTimeout(res, 500)); 
+      // Fake delay to ensure a smooth, visible loading screen during date switch
+      await new Promise(res => setTimeout(res, 500));
       setIsFetching(false);
     };
     fetchAll();
-  }, [userId, selectedDate, activeTrendTab]);
+  }, [userId, selectedDate]);
 
   const [tempGoal, setTempGoal] = useState(dailyGoal.toString());
   const [tempCarbs, setTempCarbs] = useState(carbsGoal.toString());
@@ -555,11 +590,11 @@ export default function DiaryScreen() {
           .select('meal_type, calories')
           .eq('user_id', userId)
           .eq('date', selectedDate);
-        const slots = ['8AM','11AM','2PM','5PM','8PM','10PM'];
+        const slots = ['8AM', '11AM', '2PM', '5PM', '8PM', '10PM'];
         // Map meal entries to time slots with their calories
         const mealCalMap: Record<string, number> = {};
         (data || []).forEach((r: any) => { mealCalMap[r.meal_type] = r.calories || 0; });
-        const mealOrder = ['breakfast','lunch','lunch','dinner','dinner','snack'];
+        const mealOrder = ['breakfast', 'lunch', 'lunch', 'dinner', 'dinner', 'snack'];
         rows = slots.map((label, i) => ({ label, value: mealCalMap[mealOrder[i]] || 0 }));
         maxVal = Math.max(2000, ...rows.map(r => r.value));
 
@@ -581,12 +616,12 @@ export default function DiaryScreen() {
           const d = new Date(today);
           d.setDate(today.getDate() - i);
           const dateStr = d.toISOString().split('T')[0];
-          const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().slice(0,3);
-          
+          const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().slice(0, 3);
+
           const total = (data || [])
             .filter((r: any) => r.date === dateStr)
             .reduce((s: number, r: any) => s + (r.calories || 0), 0);
-            
+
           rows.push({ label: dayLabel, value: total });
         }
         maxVal = Math.max(2000, ...rows.map(r => r.value));
@@ -615,11 +650,11 @@ export default function DiaryScreen() {
           weekEnd.setDate(weekStart.getDate() + 6);
           const s = weekStart.toISOString().split('T')[0];
           const e = weekEnd.toISOString().split('T')[0];
-          
+
           const total = (data || [])
             .filter((r: any) => r.date >= s && r.date <= e)
             .reduce((s2: number, r: any) => s2 + (r.calories || 0), 0);
-            
+
           rows.push({ label: `W${4 - i}`, value: total });
         }
         maxVal = Math.max(2000, ...rows.map(r => r.value));
@@ -635,7 +670,7 @@ export default function DiaryScreen() {
 
   const trendTabsList = ['day', 'week', 'month'];
   const activeTabIndex = trendTabsList.indexOf(activeTrendTab);
-  
+
   const animatedTabIndicatorStyle = useAnimatedStyle(() => {
     return {
       transform: [{ translateX: withTiming(activeTabIndex * 60, { duration: 400, easing: Easing.out(Easing.exp) }) }]
@@ -786,180 +821,180 @@ export default function DiaryScreen() {
           </View>
         ) : (
           <>
-        {/* Daily Calorie Target Gauge */}
-        <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.targetCard, { backgroundColor: theme.cardBackground }]}>
-          <TouchableOpacity 
-            style={[styles.editTargetBtn, { backgroundColor: theme.pillBackground }]}
-            onPress={() => {
-              setTempGoal(dailyGoal.toString());
-              setEditModalVisible(true);
-            }}
-          >
-            <Ionicons name="pencil" size={16} color={theme.textMuted} />
-          </TouchableOpacity>
+            {/* Daily Calorie Target Gauge */}
+            <Animated.View entering={FadeInDown.duration(500).delay(100)} style={[styles.targetCard, { backgroundColor: theme.cardBackground }]}>
+              <TouchableOpacity
+                style={[styles.editTargetBtn, { backgroundColor: theme.pillBackground }]}
+                onPress={() => {
+                  setTempGoal(dailyGoal.toString());
+                  setEditModalVisible(true);
+                }}
+              >
+                <Ionicons name="pencil" size={16} color={theme.textMuted} />
+              </TouchableOpacity>
 
-          <View style={[styles.targetPill, { borderColor: theme.macroRingBg }]}>
-            <Text style={[styles.targetPillText, { color: theme.textSecondary }]}>{t.dailyCalorieTarget}</Text>
-          </View>
-          
-          <View style={styles.gaugeWrapper}>
-            <DashedGauge
-              percentage={Math.min(totalCalories / dailyGoal, 1)}
-              radius={120}
-              strokeWidth={24}
-              filledColor="#7EB93C"
-              unfilledColor={theme.gaugeUnfilled}
-            />
-            <View style={styles.gaugeCenter}>
-              <Text style={[styles.gaugeValue, { color: theme.textPrimary }]}>{totalCalories}</Text>
-              <Text style={[styles.gaugeTotal, { color: theme.textMuted }]}>{t.ofKcal.replace('{goal}', dailyGoal.toString())}</Text>
-            </View>
-          </View>
-        </Animated.View>
+              <View style={[styles.targetPill, { borderColor: theme.macroRingBg }]}>
+                <Text style={[styles.targetPillText, { color: theme.textSecondary }]}>{t.dailyCalorieTarget}</Text>
+              </View>
 
-        {/* Add Food Button */}
-        <Animated.View entering={FadeInDown.duration(500).delay(125)}>
-          <TouchableOpacity style={styles.addFoodBtn} activeOpacity={0.8} onPress={handleAddFood}>
-            <Ionicons name="camera" size={22} color="#FFFFFF" />
-            <Text style={styles.addFoodBtnText}>{t.addFood}</Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Macros Row */}
-        <Animated.View entering={FadeInDown.duration(500).delay(150)} style={styles.macrosRow}>
-          <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
-            <MacroRing percentage={carbsGoal ? totalCarbs / carbsGoal : 0} color="#F4C344" unfilledColor={theme.macroRingBg}>
-              <MaterialCommunityIcons name="corn" size={24} color="#F4C344" />
-            </MacroRing>
-            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalCarbs}</Text>
-            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', carbsGoal.toString())}</Text>
-            <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
-              <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.carbs}</Text>
-            </View>
-          </View>
-          <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
-            <MacroRing percentage={proteinGoal ? totalProtein / proteinGoal : 0} color="#C93A3E" unfilledColor={theme.macroRingBg}>
-              <MaterialCommunityIcons name="food-steak" size={24} color="#C93A3E" />
-            </MacroRing>
-            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalProtein}</Text>
-            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', proteinGoal.toString())}</Text>
-            <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
-              <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.protein}</Text>
-            </View>
-          </View>
-          <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
-            <MacroRing percentage={fatGoal ? totalFat / fatGoal : 0} color="#E8A86F" unfilledColor={theme.macroRingBg}>
-              <Ionicons name="water" size={24} color="#E8A86F" />
-            </MacroRing>
-            <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalFat}</Text>
-            <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', fatGoal.toString())}</Text>
-            <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
-              <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.fat}</Text>
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* Calorie Trends Chart */}
-        <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[styles.chartCard, { backgroundColor: theme.cardBackground }]}>
-          <View style={styles.chartHeader}>
-            <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>{t.calorieTrends}</Text>
-            <View style={[styles.chartTabs, { backgroundColor: theme.pillBackground, position: 'relative', overflow: 'hidden' }]}>
-              <Animated.View style={[{
-                position: 'absolute',
-                top: 4,
-                bottom: 4,
-                left: 4,
-                width: 60,
-                backgroundColor: '#7EB93C',
-                borderRadius: 6,
-              }, animatedTabIndicatorStyle]} />
-              
-              {trendTabsList.map((tab) => (
-                <TouchableOpacity 
-                  key={tab}
-                  style={[styles.chartTab, { width: 60, alignItems: 'center', backgroundColor: 'transparent' }]} 
-                  onPress={() => setActiveTrendTab(tab as any)}
-                >
-                  <Text style={[styles.chartTabText, activeTrendTab === tab ? styles.chartTabTextActive : { color: theme.textMuted }]}>
-                    {t[tab as keyof typeof t] || tab}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-          
-          <View style={styles.chartBody}>
-            <View style={styles.yAxis}>
-              {[trendMax, Math.round(trendMax*0.8), Math.round(trendMax*0.6), Math.round(trendMax*0.4), Math.round(trendMax*0.2), 0].map((v) => (
-                <Text key={v} style={[styles.yAxisText, { color: theme.textMuted }]}>{v}</Text>
-              ))}
-            </View>
-            
-            <View style={styles.barsContainer}>
-              {trendChartData.length === 0 ? (
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{ color: theme.textMuted, fontSize: 12 }}>No data yet</Text>
+              <View style={styles.gaugeWrapper}>
+                <DashedGauge
+                  percentage={Math.min(totalCalories / dailyGoal, 1)}
+                  radius={120}
+                  strokeWidth={24}
+                  filledColor="#7EB93C"
+                  unfilledColor={theme.gaugeUnfilled}
+                />
+                <View style={styles.gaugeCenter}>
+                  <Text style={[styles.gaugeValue, { color: theme.textPrimary }]}>{totalCalories}</Text>
+                  <Text style={[styles.gaugeTotal, { color: theme.textMuted }]}>{t.ofKcal.replace('{goal}', dailyGoal.toString())}</Text>
                 </View>
-              ) : trendChartData.map((item) => (
-                <View key={item.label} style={styles.barCol}>
-                  <View style={styles.barWrapper}>
-                    <View style={[styles.barTrack, { backgroundColor: theme.pillBackground }]} />
-                    <AnimatedBarFill 
-                      percentage={trendMax > 0 ? (item.value / trendMax) * 100 : 0} 
-                      style={styles.barFill} 
-                    />
-                  </View>
-                  <Text style={[styles.xAxisText, { color: theme.textMuted }]}>{item.label}</Text>
+              </View>
+            </Animated.View>
+
+            {/* Add Food Button */}
+            <Animated.View entering={FadeInDown.duration(500).delay(125)}>
+              <TouchableOpacity style={styles.addFoodBtn} activeOpacity={0.8} onPress={handleAddFood}>
+                <Ionicons name="camera" size={22} color="#FFFFFF" />
+                <Text style={styles.addFoodBtnText}>{t.addFood}</Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Macros Row */}
+            <Animated.View entering={FadeInDown.duration(500).delay(150)} style={styles.macrosRow}>
+              <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
+                <MacroRing percentage={carbsGoal ? totalCarbs / carbsGoal : 0} color="#F4C344" unfilledColor={theme.macroRingBg}>
+                  <MaterialCommunityIcons name="corn" size={24} color="#F4C344" />
+                </MacroRing>
+                <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalCarbs}</Text>
+                <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', carbsGoal.toString())}</Text>
+                <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
+                  <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.carbs}</Text>
                 </View>
-              ))}
-            </View>
-          </View>
-        </Animated.View>
+              </View>
+              <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
+                <MacroRing percentage={proteinGoal ? totalProtein / proteinGoal : 0} color="#C93A3E" unfilledColor={theme.macroRingBg}>
+                  <MaterialCommunityIcons name="food-steak" size={24} color="#C93A3E" />
+                </MacroRing>
+                <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalProtein}</Text>
+                <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', proteinGoal.toString())}</Text>
+                <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
+                  <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.protein}</Text>
+                </View>
+              </View>
+              <View style={[styles.macroCard, { backgroundColor: theme.cardBackground }]}>
+                <MacroRing percentage={fatGoal ? totalFat / fatGoal : 0} color="#E8A86F" unfilledColor={theme.macroRingBg}>
+                  <Ionicons name="water" size={24} color="#E8A86F" />
+                </MacroRing>
+                <Text style={[styles.macroVal, { color: theme.textPrimary }]}>{totalFat}</Text>
+                <Text style={[styles.macroTotal, { color: theme.textMuted }]}>{t.ofGr.replace('{max}', fatGoal.toString())}</Text>
+                <View style={[styles.macroNamePill, { borderColor: theme.macroRingBg }]}>
+                  <Text style={[styles.macroNameText, { color: theme.textSecondary }]}>{t.fat}</Text>
+                </View>
+              </View>
+            </Animated.View>
 
-        {/* Meal Sections */}
-        {localizedMeals.map((meal, index) => (
-          <Animated.View
-            key={meal.id}
-            entering={FadeInDown.duration(500).delay(150 + index * 80)}
-          >
-            <TouchableOpacity 
-              activeOpacity={0.85} 
-              style={[styles.mealCard, { backgroundColor: theme.cardBackground, borderColor: theme.mealBorder }]}
-              onPress={() => router.push('/history')}
-            >
-              {/* Left color stripe */}
-              <View style={[styles.mealStripe, { backgroundColor: meal.color }]} />
+            {/* Calorie Trends Chart */}
+            <Animated.View entering={FadeInDown.duration(500).delay(200)} style={[styles.chartCard, { backgroundColor: theme.cardBackground }]}>
+              <View style={styles.chartHeader}>
+                <Text style={[styles.chartTitle, { color: theme.textPrimary }]}>{t.calorieTrends}</Text>
+                <View style={[styles.chartTabs, { backgroundColor: theme.pillBackground, position: 'relative', overflow: 'hidden' }]}>
+                  <Animated.View style={[{
+                    position: 'absolute',
+                    top: 4,
+                    bottom: 4,
+                    left: 4,
+                    width: 60,
+                    backgroundColor: '#7EB93C',
+                    borderRadius: 6,
+                  }, animatedTabIndicatorStyle]} />
 
-              <View style={styles.mealContent}>
-                <View style={styles.mealHeader}>
-                  <Text style={[styles.mealLabel, { color: theme.textPrimary }]}>{meal.label}</Text>
-                  {meal.calories > 0 && (
-                    <View style={[styles.mealCalBadge, { backgroundColor: meal.color + '22' }]}>
-                      <Text style={[styles.mealCalBadgeText, { color: meal.color }]}>
-                        {meal.calories} kcal
+                  {trendTabsList.map((tab) => (
+                    <TouchableOpacity
+                      key={tab}
+                      style={[styles.chartTab, { width: 60, alignItems: 'center', backgroundColor: 'transparent' }]}
+                      onPress={() => setActiveTrendTab(tab as any)}
+                    >
+                      <Text style={[styles.chartTabText, activeTrendTab === tab ? styles.chartTabTextActive : { color: theme.textMuted }]}>
+                        {t[tab as keyof typeof t] || tab}
                       </Text>
-                    </View>
-                  )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.chartBody}>
+                <View style={styles.yAxis}>
+                  {[trendMax, Math.round(trendMax * 0.8), Math.round(trendMax * 0.6), Math.round(trendMax * 0.4), Math.round(trendMax * 0.2), 0].map((v) => (
+                    <Text key={v} style={[styles.yAxisText, { color: theme.textMuted }]}>{v}</Text>
+                  ))}
                 </View>
 
-                {meal.empty ? (
-                  <Text style={[styles.mealEmptyText, { color: theme.mealEmptyText }]}>{t.noProducts}</Text>
-                ) : (
-                  meal.items.map((item: any, i: number) => {
-                    const title = typeof item === 'object' && item !== null ? item.title : item;
-                    return (
-                      <Text key={i} style={[styles.mealItemText, { color: theme.textSecondary }]} numberOfLines={1}>• {title}</Text>
-                    );
-                  })
-                )}
+                <View style={styles.barsContainer}>
+                  {trendChartData.length === 0 ? (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                      <Text style={{ color: theme.textMuted, fontSize: 12 }}>No data yet</Text>
+                    </View>
+                  ) : trendChartData.map((item) => (
+                    <View key={item.label} style={styles.barCol}>
+                      <View style={styles.barWrapper}>
+                        <View style={[styles.barTrack, { backgroundColor: theme.pillBackground }]} />
+                        <AnimatedBarFill
+                          percentage={trendMax > 0 ? (item.value / trendMax) * 100 : 0}
+                          style={styles.barFill}
+                        />
+                      </View>
+                      <Text style={[styles.xAxisText, { color: theme.textMuted }]}>{item.label}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
+            </Animated.View>
 
-              <View style={{ paddingRight: 16 }}>
-                <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        ))}
+            {/* Meal Sections */}
+            {localizedMeals.map((meal, index) => (
+              <Animated.View
+                key={meal.id}
+                entering={FadeInDown.duration(500).delay(150 + index * 80)}
+              >
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[styles.mealCard, { backgroundColor: theme.cardBackground, borderColor: theme.mealBorder }]}
+                  onPress={() => router.push('/history')}
+                >
+                  {/* Left color stripe */}
+                  <View style={[styles.mealStripe, { backgroundColor: meal.color }]} />
+
+                  <View style={styles.mealContent}>
+                    <View style={styles.mealHeader}>
+                      <Text style={[styles.mealLabel, { color: theme.textPrimary }]}>{meal.label}</Text>
+                      {meal.calories > 0 && (
+                        <View style={[styles.mealCalBadge, { backgroundColor: meal.color + '22' }]}>
+                          <Text style={[styles.mealCalBadgeText, { color: meal.color }]}>
+                            {meal.calories} kcal
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {meal.empty ? (
+                      <Text style={[styles.mealEmptyText, { color: theme.mealEmptyText }]}>{t.noProducts}</Text>
+                    ) : (
+                      meal.items.map((item: any, i: number) => {
+                        const title = typeof item === 'object' && item !== null ? item.title : item;
+                        return (
+                          <Text key={i} style={[styles.mealItemText, { color: theme.textSecondary }]} numberOfLines={1}>• {title}</Text>
+                        );
+                      })
+                    )}
+                  </View>
+
+                  <View style={{ paddingRight: 16 }}>
+                    <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
           </>
         )}
 
@@ -967,153 +1002,161 @@ export default function DiaryScreen() {
 
       {/* Calendar Modal */}
       <Modal visible={isCalendarVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5, padding: 0, overflow: 'hidden' }]}>
-            <Calendar
-              current={selectedDate}
-              onDayPress={(day: any) => {
-                setSelectedDate(day.dateString);
-                setCalendarVisible(false);
-              }}
-              theme={{
-                backgroundColor: theme.cardBackground,
-                calendarBackground: theme.cardBackground,
-                textSectionTitleColor: theme.textSecondary,
-                selectedDayBackgroundColor: '#7EB93C',
-                selectedDayTextColor: '#ffffff',
-                todayTextColor: '#7EB93C',
-                dayTextColor: theme.textPrimary,
-                textDisabledColor: theme.textMuted,
-                dotColor: '#7EB93C',
-                selectedDotColor: '#ffffff',
-                arrowColor: '#7EB93C',
-                monthTextColor: theme.textPrimary,
-                indicatorColor: '#7EB93C',
-              }}
-              markedDates={{
-                [selectedDate]: { selected: true, disableTouchEvent: true }
-              }}
-            />
-            <TouchableOpacity 
-              style={[styles.modalCancelBtn, { backgroundColor: theme.pillBackground, margin: 16 }]} 
-              onPress={() => setCalendarVisible(false)}
-            >
-              <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
-            </TouchableOpacity>
+        <TouchableWithoutFeedback onPress={() => setCalendarVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5, padding: 0, overflow: 'hidden' }]}>
+                <Calendar
+                  current={selectedDate}
+                  onDayPress={(day: any) => {
+                    setSelectedDate(day.dateString);
+                    setCalendarVisible(false);
+                  }}
+                  theme={{
+                    backgroundColor: theme.cardBackground,
+                    calendarBackground: theme.cardBackground,
+                    textSectionTitleColor: theme.textSecondary,
+                    selectedDayBackgroundColor: '#7EB93C',
+                    selectedDayTextColor: '#ffffff',
+                    todayTextColor: '#7EB93C',
+                    dayTextColor: theme.textPrimary,
+                    textDisabledColor: theme.textMuted,
+                    dotColor: '#7EB93C',
+                    selectedDotColor: '#ffffff',
+                    arrowColor: '#7EB93C',
+                    monthTextColor: theme.textPrimary,
+                    indicatorColor: '#7EB93C',
+                  }}
+                  markedDates={{
+                    [selectedDate]: { selected: true, disableTouchEvent: true }
+                  }}
+                />
+                <TouchableOpacity
+                  style={[styles.modalCancelBtn, { backgroundColor: theme.pillBackground, margin: 16 }]}
+                  onPress={() => setCalendarVisible(false)}
+                >
+                  <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Edit Goal Modal */}
       <Modal visible={isEditModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5, width: '85%' }]}>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary, marginBottom: 8 }]}>{t.updateDailyGoal}</Text>
-            <Text style={{fontSize: 13, color: theme.textMuted, marginBottom: 20, textAlign: 'center'}}>
-              Edit total calories or specific macros. Calories will recalculate automatically.
-            </Text>
+        <TouchableWithoutFeedback onPress={() => setEditModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5, width: '85%' }]}>
+                <Text style={[styles.modalTitle, { color: theme.textPrimary, marginBottom: 8 }]}>{t.updateDailyGoal}</Text>
+                <Text style={{ fontSize: 13, color: theme.textMuted, marginBottom: 20, textAlign: 'center' }}>
+                  Edit total calories or specific macros. Calories will recalculate automatically.
+                </Text>
 
-            <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12}}>
-              <Text style={{width: 90, color: theme.textSecondary, fontWeight: '600'}}>Calories</Text>
-              <TextInput
-                style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
-                keyboardType="numeric"
-                value={tempGoal}
-                onChangeText={(val) => {
-                  setTempGoal(val);
-                  const parsed = parseInt(val, 10);
-                  if (!isNaN(parsed) && parsed > 0) {
-                    setTempCarbs(Math.round((parsed * 0.50) / 4).toString());
-                    setTempProtein(Math.round((parsed * 0.30) / 4).toString());
-                    setTempFat(Math.round((parsed * 0.20) / 9).toString());
-                  }
-                }}
-              />
-            </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Calories</Text>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
+                    keyboardType="numeric"
+                    value={tempGoal}
+                    onChangeText={(val) => {
+                      setTempGoal(val);
+                      const parsed = parseInt(val, 10);
+                      if (!isNaN(parsed) && parsed > 0) {
+                        setTempCarbs(Math.round((parsed * 0.50) / 4).toString());
+                        setTempProtein(Math.round((parsed * 0.30) / 4).toString());
+                        setTempFat(Math.round((parsed * 0.20) / 9).toString());
+                      }
+                    }}
+                  />
+                </View>
 
-            <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12}}>
-              <Text style={{width: 90, color: theme.textSecondary, fontWeight: '600'}}>Carbs (g)</Text>
-              <TextInput
-                style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
-                keyboardType="numeric"
-                value={tempCarbs}
-                onChangeText={(val) => {
-                  setTempCarbs(val);
-                  const c = parseInt(val, 10) || 0;
-                  const p = parseInt(tempProtein, 10) || 0;
-                  const f = parseInt(tempFat, 10) || 0;
-                  setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
-                }}
-              />
-            </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Carbs (g)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
+                    keyboardType="numeric"
+                    value={tempCarbs}
+                    onChangeText={(val) => {
+                      setTempCarbs(val);
+                      const c = parseInt(val, 10) || 0;
+                      const p = parseInt(tempProtein, 10) || 0;
+                      const f = parseInt(tempFat, 10) || 0;
+                      setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
+                    }}
+                  />
+                </View>
 
-            <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12}}>
-              <Text style={{width: 90, color: theme.textSecondary, fontWeight: '600'}}>Protein (g)</Text>
-              <TextInput
-                style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
-                keyboardType="numeric"
-                value={tempProtein}
-                onChangeText={(val) => {
-                  setTempProtein(val);
-                  const c = parseInt(tempCarbs, 10) || 0;
-                  const p = parseInt(val, 10) || 0;
-                  const f = parseInt(tempFat, 10) || 0;
-                  setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
-                }}
-              />
-            </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Protein (g)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
+                    keyboardType="numeric"
+                    value={tempProtein}
+                    onChangeText={(val) => {
+                      setTempProtein(val);
+                      const c = parseInt(tempCarbs, 10) || 0;
+                      const p = parseInt(val, 10) || 0;
+                      const f = parseInt(tempFat, 10) || 0;
+                      setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
+                    }}
+                  />
+                </View>
 
-            <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 20}}>
-              <Text style={{width: 90, color: theme.textSecondary, fontWeight: '600'}}>Fat (g)</Text>
-              <TextInput
-                style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
-                keyboardType="numeric"
-                value={tempFat}
-                onChangeText={(val) => {
-                  setTempFat(val);
-                  const c = parseInt(tempCarbs, 10) || 0;
-                  const p = parseInt(tempProtein, 10) || 0;
-                  const f = parseInt(val, 10) || 0;
-                  setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
-                }}
-              />
-            </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 20 }}>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Fat (g)</Text>
+                  <TextInput
+                    style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
+                    keyboardType="numeric"
+                    value={tempFat}
+                    onChangeText={(val) => {
+                      setTempFat(val);
+                      const c = parseInt(tempCarbs, 10) || 0;
+                      const p = parseInt(tempProtein, 10) || 0;
+                      const f = parseInt(val, 10) || 0;
+                      setTempGoal(((c * 4) + (p * 4) + (f * 9)).toString());
+                    }}
+                  />
+                </View>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: theme.pillBackground }]} onPress={() => setEditModalVisible(false)}>
-                <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={async () => {
-                const newGoal = parseInt(tempGoal, 10);
-                const newCarbs = parseInt(tempCarbs, 10);
-                const newProtein = parseInt(tempProtein, 10);
-                const newFat = parseInt(tempFat, 10);
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={[styles.modalCancelBtn, { backgroundColor: theme.pillBackground }]} onPress={() => setEditModalVisible(false)}>
+                    <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>{t.cancel}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.modalSaveBtn} onPress={async () => {
+                    const newGoal = parseInt(tempGoal, 10);
+                    const newCarbs = parseInt(tempCarbs, 10);
+                    const newProtein = parseInt(tempProtein, 10);
+                    const newFat = parseInt(tempFat, 10);
 
-                if (!isNaN(newGoal) && newGoal > 0) {
-                  MockStore.update({ dailyCalorieGoal: newGoal });
-                  setCarbsGoal(newCarbs || 0);
-                  setProteinGoal(newProtein || 0);
-                  setFatGoal(newFat || 0);
-                  
-                  if (userId) {
-                    const { error } = await supabase
-                      .from('profiles')
-                      .update({ 
-                        daily_calorie_goal: newGoal
-                      })
-                      .eq('id', userId);
-                    if (error) {
-                      console.error("Error updating goal:", error);
+                    if (!isNaN(newGoal) && newGoal > 0) {
+                      MockStore.update({ dailyCalorieGoal: newGoal });
+                      setCarbsGoal(newCarbs || 0);
+                      setProteinGoal(newProtein || 0);
+                      setFatGoal(newFat || 0);
+
+                      if (userId) {
+                        const { error } = await supabase
+                          .from('profiles')
+                          .update({
+                            daily_calorie_goal: newGoal
+                          })
+                          .eq('id', userId);
+                        if (error) {
+                          console.error("Error updating goal:", error);
+                        }
+                      }
                     }
-                  }
-                }
-                setEditModalVisible(false);
-              }}>
-                <Text style={styles.modalSaveText}>{t.save}</Text>
-              </TouchableOpacity>
-            </View>
+                    setEditModalVisible(false);
+                  }}>
+                    <Text style={styles.modalSaveText}>{t.save}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Removed Meal Type Selector Modal */}
@@ -1132,7 +1175,7 @@ export default function DiaryScreen() {
                   <Animated.View style={[styles.scanLine, scanLineStyle]} />
                 </View>
                 <Text style={styles.scanText}>Align food in frame</Text>
-                
+
                 <View style={styles.cameraActions}>
                   <TouchableOpacity style={styles.closeCameraBtn} onPress={() => setIsScanning(false)}>
                     <Ionicons name="close" size={30} color="#FFF" />
@@ -1148,7 +1191,7 @@ export default function DiaryScreen() {
                         setScannedResult(placeholderResult);
                         setScannerStep('processing');
                         resultTransition.value = 0;
-                        
+
                         try {
                           const aiResult = await analyzeFoodWithAI(photo.base64);
                           if (aiResult.error === 'not_food') {
@@ -1182,7 +1225,7 @@ export default function DiaryScreen() {
             <View style={styles.resultContainer}>
               <Animated.View style={[styles.resultImageWrapper, animatedImageWrapperStyle]}>
                 <Image source={{ uri: scannedResult.image }} style={styles.resultImage} />
-                
+
                 {/* Result header buttons fade in */}
                 <Animated.View style={[styles.resultTopBar, animatedDetailsOpacityStyle]}>
                   <TouchableOpacity style={styles.iconBtnBack} onPress={() => { setScannerStep('camera'); setScannedResult(null); }}>
@@ -1217,25 +1260,25 @@ export default function DiaryScreen() {
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.resultScrollContent}>
                   <Text style={styles.resultTitle}>{scannedResult.title}</Text>
                   <Text style={styles.resultSubtitle}>{scannedResult.subtitle}</Text>
-                  
+
                   <View style={styles.servingRow}>
-                    <Text style={styles.servingText}><Text style={{fontWeight:'800'}}>{scannedResult.serving}</Text> Serving</Text>
-                    <Text style={styles.caloriesText}><Text style={{color:'#C93A3E'}}>{scannedResult.calories}</Text> Kcal</Text>
+                    <Text style={styles.servingText}><Text style={{ fontWeight: '800' }}>{scannedResult.serving}</Text> Serving</Text>
+                    <Text style={styles.caloriesText}><Text style={{ color: '#C93A3E' }}>{scannedResult.calories}</Text> Kcal</Text>
                   </View>
 
                   <View style={styles.resultMacrosRow}>
                     <View style={styles.resultMacroCard}>
-                      <View style={styles.resultMacroIconBg}><Text style={{fontSize: 20}}>🍚</Text></View>
+                      <View style={styles.resultMacroIconBg}><Text style={{ fontSize: 20 }}>🍚</Text></View>
                       <Text style={styles.resultMacroVal}>{scannedResult.macros.carbs}<Text style={styles.resultMacroUnit}>gr</Text></Text>
                       <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Carbs</Text></View>
                     </View>
                     <View style={styles.resultMacroCard}>
-                      <View style={styles.resultMacroIconBg}><Text style={{fontSize: 20}}>🍗</Text></View>
+                      <View style={styles.resultMacroIconBg}><Text style={{ fontSize: 20 }}>🍗</Text></View>
                       <Text style={styles.resultMacroVal}>{scannedResult.macros.protein}<Text style={styles.resultMacroUnit}>gr</Text></Text>
                       <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Protein</Text></View>
                     </View>
                     <View style={styles.resultMacroCard}>
-                      <View style={styles.resultMacroIconBg}><Text style={{fontSize: 20}}>💧</Text></View>
+                      <View style={styles.resultMacroIconBg}><Text style={{ fontSize: 20 }}>💧</Text></View>
                       <Text style={styles.resultMacroVal}>{scannedResult.macros.fat}<Text style={styles.resultMacroUnit}>gr</Text></Text>
                       <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Fat</Text></View>
                     </View>
@@ -1250,7 +1293,7 @@ export default function DiaryScreen() {
                           <Text style={styles.ingredientWeight}>{ing.weight}</Text>
                         </View>
                         <View style={styles.ingredientBottom}>
-                          <Text style={styles.ingredientCals}>{ing.calories} <Text style={{color: '#888'}}>Kcal</Text></Text>
+                          <Text style={styles.ingredientCals}>{ing.calories} <Text style={{ color: '#888' }}>Kcal</Text></Text>
                           <View style={styles.ingredientMacros}>
                             <View style={styles.ingMacroBadge}><Text style={styles.ingMacroText}>🍚 {ing.carbs}gr</Text></View>
                             <View style={styles.ingMacroBadge}><Text style={styles.ingMacroText}>🍗 {ing.protein}gr</Text></View>
@@ -1265,10 +1308,10 @@ export default function DiaryScreen() {
                 <View style={styles.resultAddBtnContainer}>
                   <View style={styles.mealTypeChips}>
                     {['breakfast', 'lunch', 'dinner', 'snack'].map(type => (
-                      <TouchableOpacity 
-                        key={type} 
+                      <TouchableOpacity
+                        key={type}
                         style={[
-                          styles.mealTypeChip, 
+                          styles.mealTypeChip,
                           selectedMealType === type && styles.mealTypeChipSelected
                         ]}
                         onPress={() => setSelectedMealType(type)}
@@ -1282,17 +1325,17 @@ export default function DiaryScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <TouchableOpacity 
-                    style={[styles.resultAddBtn, !selectedMealType && { opacity: 0.5 }]} 
+                  <TouchableOpacity
+                    style={[styles.resultAddBtn, !selectedMealType && { opacity: 0.5 }]}
                     disabled={!selectedMealType}
                     onPress={async () => {
                       if (selectedMealType && userId) {
                         const targetMeal = meals.find(m => m.id === selectedMealType);
-                        const currentItems    = targetMeal ? targetMeal.items   : [];
+                        const currentItems = targetMeal ? targetMeal.items : [];
                         const currentCalories = targetMeal ? targetMeal.calories : 0;
-                        const currentCarbs    = targetMeal ? (targetMeal.carbs   || 0) : 0;
-                        const currentProtein  = targetMeal ? (targetMeal.protein || 0) : 0;
-                        const currentFat      = targetMeal ? (targetMeal.fat     || 0) : 0;
+                        const currentCarbs = targetMeal ? (targetMeal.carbs || 0) : 0;
+                        const currentProtein = targetMeal ? (targetMeal.protein || 0) : 0;
+                        const currentFat = targetMeal ? (targetMeal.fat || 0) : 0;
                         const newItemObj = {
                           title: scannedResult.title,
                           calories: scannedResult.calories,
@@ -1300,11 +1343,11 @@ export default function DiaryScreen() {
                           protein: scannedResult.macros?.protein || 0,
                           fat: scannedResult.macros?.fat || 0,
                         };
-                        const newItems    = [...currentItems, newItemObj];
+                        const newItems = [...currentItems, newItemObj];
                         const newCalories = currentCalories + scannedResult.calories;
-                        const newCarbs    = currentCarbs    + (scannedResult.macros?.carbs   || 0);
-                        const newProtein  = currentProtein  + (scannedResult.macros?.protein || 0);
-                        const newFat      = currentFat      + (scannedResult.macros?.fat     || 0);
+                        const newCarbs = currentCarbs + (scannedResult.macros?.carbs || 0);
+                        const newProtein = currentProtein + (scannedResult.macros?.protein || 0);
+                        const newFat = currentFat + (scannedResult.macros?.fat || 0);
 
                         const updatedMeals = meals.map(m => {
                           if (m.id === selectedMealType) {
@@ -1313,9 +1356,9 @@ export default function DiaryScreen() {
                           return m;
                         });
                         setMeals(updatedMeals);
-                        setTotalCarbs(updatedMeals.reduce((s: number, m: any) => s + (m.carbs   || 0), 0));
+                        setTotalCarbs(updatedMeals.reduce((s: number, m: any) => s + (m.carbs || 0), 0));
                         setTotalProtein(updatedMeals.reduce((s: number, m: any) => s + (m.protein || 0), 0));
-                        setTotalFat(updatedMeals.reduce((s: number, m: any) => s + (m.fat     || 0), 0));
+                        setTotalFat(updatedMeals.reduce((s: number, m: any) => s + (m.fat || 0), 0));
 
                         setIsScanning(false);
                         setTimeout(() => {
@@ -1331,18 +1374,18 @@ export default function DiaryScreen() {
                             date: selectedDate,
                             meal_type: selectedMealType,
                             calories: newCalories,
-                            carbs:    newCarbs,
-                            protein:  newProtein,
-                            fat:      newFat,
+                            carbs: newCarbs,
+                            protein: newProtein,
+                            fat: newFat,
                             items: JSON.stringify(newItems)
                           }, { onConflict: 'user_id, date, meal_type' });
-                          
+
                         if (error) {
                           console.error("Error saving to diary_entries:", error);
                         }
                       } else if (selectedMealType) {
-                         // Fallback for non-authenticated local usage just in case
-                         setMeals(current => current.map(m => {
+                        // Fallback for non-authenticated local usage just in case
+                        setMeals(current => current.map(m => {
                           if (m.id === selectedMealType) {
                             return {
                               ...m,
@@ -1381,8 +1424,8 @@ export default function DiaryScreen() {
               <Text style={{ fontSize: 24, fontWeight: '700', color: '#FFF', textAlign: 'center', marginBottom: 12 }}>We couldn't identify any food.</Text>
               <Text style={{ fontSize: 16, color: '#AAA', textAlign: 'center', marginBottom: 40 }}>Please make sure the dish is clearly visible and the photo is of good quality.</Text>
               <View style={{ width: '100%', gap: 16, paddingHorizontal: 20 }}>
-                <TouchableOpacity 
-                  style={{ backgroundColor: '#7EB93C', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }} 
+                <TouchableOpacity
+                  style={{ backgroundColor: '#7EB93C', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }}
                   onPress={() => {
                     setScannedResult(null);
                     setScannerStep('camera');
@@ -1390,8 +1433,8 @@ export default function DiaryScreen() {
                 >
                   <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '600' }}>Try Again</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={{ backgroundColor: '#333', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }} 
+                <TouchableOpacity
+                  style={{ backgroundColor: '#333', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }}
                   onPress={() => {
                     setIsScanning(false);
                     setScannerStep('camera');

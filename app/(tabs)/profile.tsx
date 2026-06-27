@@ -76,6 +76,7 @@ export default function ProfileScreen() {
   const [height, setHeight] = useState<number | null>(MockStore.height);
   const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
+
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -120,11 +121,12 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = () => {
+    setIsLoggingOut(false);
     setLogoutModalVisible(true);
   };
 
   const confirmLogoutAction = async () => {
-    setLogoutModalVisible(false);
+    setIsLoggingOut(true);
     try {
       await supabase.auth.signOut();
       // Reset MockStore values
@@ -140,10 +142,14 @@ export default function ProfileScreen() {
         age: null,
         height: null,
       });
+      setLogoutModalVisible(false);
       router.replace('/(auth)/login');
     } catch (err) {
       console.warn('Sign out error:', err);
+      setLogoutModalVisible(false);
       router.replace('/(auth)/login');
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -372,7 +378,7 @@ export default function ProfileScreen() {
         visible={logoutModalVisible}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setLogoutModalVisible(false)}
+        onRequestClose={() => { if (!isLoggingOut) setLogoutModalVisible(false); }}
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
