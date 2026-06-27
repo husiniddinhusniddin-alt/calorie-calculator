@@ -20,6 +20,11 @@ import {
   useColorScheme,
   View
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { Calendar } from 'react-native-calendars';
 import Animated, { Easing, FadeInDown, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -392,7 +397,8 @@ const analyzeFoodWithAI = async (base64Image: string) => {
 
 export default function DiaryScreen() {
   const router = useRouter();
-
+q  const insets = useSafeAreaInsets();
+  
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
   const [dailyGoal, setDailyGoal] = useState(MockStore.dailyCalorieGoal);
@@ -759,13 +765,13 @@ export default function DiaryScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: Math.max(10, insets.top - 35) }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* Fixed Header */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, zIndex: 10, backgroundColor: theme.background }}>
-        <Animated.View entering={FadeInDown.duration(500)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <TouchableOpacity
+      {/* Header Top Row - Fixed */}
+      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
             style={[styles.datePill, { backgroundColor: theme.pillBackground }]}
             onPress={() => setCalendarVisible(true)}
           >
@@ -777,7 +783,7 @@ export default function DiaryScreen() {
               <Text style={[styles.dateFull, { color: theme.textMuted }]}>{formattedDate}</Text>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity 
             activeOpacity={0.7}
             onPress={() => router.push('/profile')}
           >
@@ -791,8 +797,8 @@ export default function DiaryScreen() {
               )}
             </View>
           </TouchableOpacity>
-        </Animated.View>
-      </View>
+        </View>
+      </Animated.View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {isFetching ? (
@@ -1457,13 +1463,15 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   header: {
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    marginBottom: 8,
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 8,
   },
   datePill: {
     flexDirection: 'row',

@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   useColorScheme,
   View,
-  ActivityIndicator
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,7 +45,6 @@ import { supabase } from '@/constants/supabase';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
@@ -80,7 +78,7 @@ export default function ProfileScreen() {
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Subscribe to MockStore updates
   useEffect(() => {
@@ -391,28 +389,20 @@ export default function ProfileScreen() {
             <Text style={[styles.modalMessage, { color: theme.textMuted }]}>{t.areYouSureLogout}</Text>
 
             <View style={styles.modalButtonsRow}>
-              {isLoggingOut ? (
-                <View style={{ flex: 1, height: 48, justifyContent: 'center', alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color="#FF4D4F" />
-                </View>
-              ) : (
-                <>
-                  <TouchableOpacity
-                    style={[styles.modalBtn, styles.modalCancelBtn, { borderColor: theme.cardBorder }]}
-                    onPress={() => setLogoutModalVisible(false)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.modalCancelBtnText, { color: theme.textPrimary }]}>{t.cancel}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalBtn, styles.modalConfirmBtn]}
-                    onPress={confirmLogoutAction}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.modalConfirmBtnText}>{t.yes}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalCancelBtn, { borderColor: theme.cardBorder }]}
+                onPress={() => setLogoutModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modalCancelBtnText, { color: theme.textPrimary }]}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalConfirmBtn]}
+                onPress={confirmLogoutAction}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalConfirmBtnText}>{t.yes}</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
