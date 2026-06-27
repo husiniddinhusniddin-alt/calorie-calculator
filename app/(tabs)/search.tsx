@@ -5,9 +5,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Pedometer } from 'expo-sensors';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
+  Easing,
   Modal,
   ScrollView,
   StyleSheet,
@@ -16,9 +18,8 @@ import {
   useColorScheme,
   View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline } from 'react-native-maps';
-import Animated, {
+import {
   FadeInDown,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -153,6 +154,36 @@ const StepRing = ({ steps, goal, isDark, t }: any) => {
   );
 };
 
+// ─── Spinning Loader ──────────────────────────────────────────────────────────
+const WalkingFigure = ({ color }: { color: string }) => {
+  const spin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
+  return (
+    <Animated.View style={{
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 4,
+      borderColor: color,
+      borderTopColor: 'transparent',
+      transform: [{ rotate }],
+    }} />
+  );
+};
+
 // ─── Route Map ────────────────────────────────────────────────────────────────
 type LatLng = { latitude: number; longitude: number };
 
@@ -164,8 +195,8 @@ const RouteMap = ({ isDark, routePoints, onPress }: { isDark: boolean; routePoin
   if (routePoints.length === 0) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.mapContainer, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
-        <Ionicons name="walk-outline" size={32} color={routeColor} />
-        <Text style={{ color: textColor, marginTop: 8, fontSize: 13 }}>
+        <WalkingFigure color={routeColor} />
+        <Text style={{ color: textColor, marginTop: 14, fontSize: 13 }}>
           Start walking to see your route
         </Text>
       </TouchableOpacity>
