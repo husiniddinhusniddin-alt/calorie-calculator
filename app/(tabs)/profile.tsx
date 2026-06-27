@@ -12,10 +12,8 @@ import {
   Text,
   TouchableOpacity,
   useColorScheme,
-<<<<<<< Updated upstream
-=======
-  View,
->>>>>>> Stashed changes
+  Modal,
+main
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,21 +24,21 @@ const translations = {
     weightMaintenance: 'Weight Maintenance', goalPrefix: 'Goal:', loseWeight: 'Lose weight', gainWeight: 'Gain weight',
     currentStreaks: 'Current Streaks', calorieTarget: 'Calorie Target', waterIntake: 'Water Intake', weightLoss: 'Weight Loss',
     personalDetails: 'Personal Details', notificationSettings: 'Notification Settings', privacySecurity: 'Privacy & Security', appPreferences: 'App Preferences',
-    logOut: 'Log Out', premiumMember: 'Premium Member', days: 'Days'
+    logOut: 'Log Out', days: 'Days', confirmLogout: 'Log Out', areYouSureLogout: 'Are you sure you want to log out?', cancel: 'Cancel', yes: 'Yes'
   },
   ru: {
     myProfile: 'Мой профиль', weight: 'Вес', height: 'Рост', age: 'Возраст', activeTargetGoal: 'АКТИВНАЯ ЦЕЛЬ', target: 'Цель',
     weightMaintenance: 'Поддержание веса', goalPrefix: 'Цель:', loseWeight: 'Сбросить вес', gainWeight: 'Набрать вес',
     currentStreaks: 'Текущие серии', calorieTarget: 'Цель по калориям', waterIntake: 'Потребление воды', weightLoss: 'Потеря веса',
     personalDetails: 'Личные данные', notificationSettings: 'Настройки уведомлений', privacySecurity: 'Конфиденциальность', appPreferences: 'Настройки',
-    logOut: 'Выйти', premiumMember: 'Премиум', days: 'Дней'
+    logOut: 'Выйти', days: 'Дней', confirmLogout: 'Выход', areYouSureLogout: 'Вы уверены, что хотите выйти?', cancel: 'Отмена', yes: 'Да'
   },
   uz: {
     myProfile: 'Mening profilim', weight: 'Vazn', height: 'Bo\'yi', age: 'Yosh', activeTargetGoal: 'FAOL MAQSAD', target: 'Maqsad',
     weightMaintenance: 'Vaznni saqlash', goalPrefix: 'Maqsad:', loseWeight: 'yo\'qotish', gainWeight: 'oshirish',
     currentStreaks: 'Hozirgi seriyalar', calorieTarget: 'Kaloriya maqsadi', waterIntake: 'Suv ichish', weightLoss: 'Vazn yo\'qotish',
     personalDetails: 'Shaxsiy ma\'lumotlar', notificationSettings: 'Bildirishnomalar', privacySecurity: 'Maxfiylik', appPreferences: 'Ilova sozlamalari',
-    logOut: 'Chiqish', premiumMember: 'Premium A\'zo', days: 'Kun'
+    logOut: 'Chiqish', days: 'Kun', confirmLogout: 'Chiqish', areYouSureLogout: 'Haqiqatan ham tizimdan chiqmoqchimisiz?', cancel: 'Bekor qilish', yes: 'Ha'
   }
 };
 
@@ -79,11 +77,9 @@ export default function ProfileScreen() {
   const [height, setHeight] = useState<number | null>(MockStore.height);
   const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
-<<<<<<< Updated upstream
-=======
+
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const insets = useSafeAreaInsets();
->>>>>>> Stashed changes
+main
 
   // Subscribe to MockStore updates
   useEffect(() => {
@@ -125,7 +121,12 @@ export default function ProfileScreen() {
     });
   }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    setLogoutModalVisible(true);
+  };
+
+  const confirmLogoutAction = async () => {
+    setLogoutModalVisible(false);
     try {
       await supabase.auth.signOut();
       // Reset MockStore values
@@ -194,10 +195,6 @@ export default function ProfileScreen() {
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <Text style={[styles.pageTitle, { color: theme.textBrand }]}>{t.myProfile}</Text>
-          <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]} activeOpacity={0.7}>
-            <Ionicons name="notifications-outline" size={24} color="#7EB93C" />
-            <View style={styles.badge} />
-          </TouchableOpacity>
         </Animated.View>
 
         {/* Profile Info Hero */}
@@ -225,10 +222,6 @@ export default function ProfileScreen() {
             <View style={styles.profileDetails}>
               <Text style={[styles.profileName, { color: theme.textPrimary }]}>{name}</Text>
               <Text style={[styles.profileEmail, { color: theme.textMuted }]}>{email}</Text>
-              <View style={[styles.tierBadge, { backgroundColor: theme.badgeBackground }]}>
-                <Ionicons name="shield-checkmark" size={12} color="#7EB93C" />
-                <Text style={styles.tierText}>{t.premiumMember}</Text>
-              </View>
             </View>
           </View>
 
@@ -332,19 +325,7 @@ export default function ProfileScreen() {
 
           <View style={[styles.menuDivider, { backgroundColor: theme.cardBorder }]} />
 
-          <TouchableOpacity 
-            style={styles.menuItem} 
-            activeOpacity={0.7}
-            onPress={() => router.push('/notification-settings')}
-          >
-            <View style={[styles.menuIconBg, { backgroundColor: theme.menuIconBg }]}>
-              <Ionicons name="notifications-outline" size={20} color="#7EB93C" />
-            </View>
-            <Text style={[styles.menuItemText, { color: theme.textPrimary }]}>{t.notificationSettings}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#CCCCCC" />
-          </TouchableOpacity>
 
-          <View style={[styles.menuDivider, { backgroundColor: theme.cardBorder }]} />
 
           <TouchableOpacity
             style={styles.menuItem}
@@ -386,9 +367,8 @@ export default function ProfileScreen() {
         </Animated.View>
 
       </ScrollView>
-<<<<<<< Updated upstream
     </SafeAreaView>
-=======
+
 
       {/* Custom Logout Modal */}
       <Modal
@@ -425,7 +405,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
     </View>
->>>>>>> Stashed changes
+ Stashed changes
   );
 }
 
@@ -448,24 +428,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
   },
-  notificationBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: 10,
-    right: 12,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF4D4F',
-  },
+
   heroCard: {
     borderRadius: 28,
     padding: 22,
@@ -679,6 +642,69 @@ const styles = StyleSheet.create({
   },
   logoutBtnText: {
     color: '#FF4D4F',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 28,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1.5,
+  },
+  modalIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCancelBtn: {
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
+  },
+  modalConfirmBtn: {
+    backgroundColor: '#FF4D4F',
+  },
+  modalCancelBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalConfirmBtnText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
