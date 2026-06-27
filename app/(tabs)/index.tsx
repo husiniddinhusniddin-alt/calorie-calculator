@@ -519,12 +519,12 @@ export default function DiaryScreen() {
     if (!userId) return;
     setIsFetching(true);
     const fetchAll = async () => {
-      // Fake delay to ensure a smooth, visible loading screen during tab/date switch
+      // Fake delay to ensure a smooth, visible loading screen during date switch
       await new Promise(res => setTimeout(res, 500));
       setIsFetching(false);
     };
     fetchAll();
-  }, [userId, selectedDate, activeTrendTab]);
+  }, [userId, selectedDate]);
 
   const [tempGoal, setTempGoal] = useState(dailyGoal.toString());
   const [tempCarbs, setTempCarbs] = useState(carbsGoal.toString());

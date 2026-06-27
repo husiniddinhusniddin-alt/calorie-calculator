@@ -12,8 +12,7 @@ import {
   Text,
   TouchableOpacity,
   useColorScheme,
-  Modal,
-main
+  View
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +45,7 @@ import { supabase } from '@/constants/supabase';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
   const [language, setLanguage] = useState(MockStore.language);
@@ -79,7 +79,6 @@ export default function ProfileScreen() {
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-main
 
   // Subscribe to MockStore updates
   useEffect(() => {
@@ -367,7 +366,6 @@ main
         </Animated.View>
 
       </ScrollView>
-    </SafeAreaView>
 
 
       {/* Custom Logout Modal */}
@@ -405,7 +403,6 @@ main
         </View>
       </Modal>
     </View>
- Stashed changes
   );
 }
 

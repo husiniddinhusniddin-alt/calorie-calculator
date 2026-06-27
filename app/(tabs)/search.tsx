@@ -8,9 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
-  SafeAreaView,
-
- main
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
