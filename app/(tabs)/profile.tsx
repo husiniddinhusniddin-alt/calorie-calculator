@@ -78,6 +78,7 @@ export default function ProfileScreen() {
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const insets = useSafeAreaInsets();
 
   // Subscribe to MockStore updates

@@ -1,686 +1,440 @@
-import { MockStore } from '@/constants/store';
-import { supabase } from '@/constants/supabase';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useColorScheme, Dimensions, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  useColorScheme,
-  View,
-} from 'react-native';
-import {
-  Provider as PaperProvider,
-  TextInput as PaperTextInput,
-  Portal,
-  Snackbar
-} from 'react-native-paper';
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { MockStore } from '@/constants/store';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
-const translations = {
-  en: {
-    setGoal: 'Set Your Goal',
-    trackProgress: 'Track your progress and stay motivated.',
-    weightGoal: 'Weight Goal',
-    current: 'Current: ',
-    targetWeightLabel: 'Target Weight (kg)',
-    maintenance: 'Weight maintenance target',
-    remainingToLoss: '{diff} kg remaining to reach goal',
-    remainingToGain: '{diff} kg to gain to reach goal',
-    goalProgress: 'Goal Progress',
-    completed: 'Completed',
-    remainingDescLoss: '{diff} kg remaining to reach your goal.',
-    remainingDescGain: '{diff} kg to gain to reach your goal.',
-    atTargetWeight: 'You are exactly at your target weight!',
-    dailyCalorieTarget: 'Daily Calorie Target ',
-    calorieTargetDesc: 'Customize your daily target or use our suggestion based on your target weight.',
-    weeklyChangeRate: 'Weekly Change Rate',
-    kgWk: '{rate} kg/wk',
-    dailyCaloriesLabel: 'Daily Calories (kcal)',
-    suggested: 'Suggested',
-    timeline: 'Timeline',
-    timelineDesc: 'Pick your target completion date to calculate your required daily commitment.',
-    targetDateLabel: 'Target Date',
-    daysRemainingDesc: 'Estimated {days} days remaining to your target.',
-    motivationQuote: '"Every small step brings you closer to your goal."',
-    motivationAuthor: 'Fitness Journey',
-    resetGoal: 'Reset Goal',
-    saveGoal: 'Save Goal',
+const GOAL_OPTIONS = [
+  { id: '1', title: 'Lose Weight', icon: 'trending-down', color: '#1890FF', unit: 'kg', defaultVal: '5' },
+  { id: '2', title: 'Gain Weight', icon: 'trending-up', color: '#FF4D4F', unit: 'kg', defaultVal: '5' },
+  { id: '3', title: 'Target Weight', icon: 'scale-outline', color: '#7EB93C', unit: 'kg', defaultVal: '70' },
+  { id: '4', title: 'Drink More Water', icon: 'water-outline', color: '#00C2FF', unit: 'Liters', defaultVal: '2' },
+  { id: '5', title: 'Daily Steps', icon: 'footsteps-outline', color: '#F4C344', unit: 'steps', defaultVal: '10000' },
+];
 
-    // Alerts/Snackbars
-    resetMsg: 'Goal settings reset to defaults.',
-    saveSuccess: 'Goals saved successfully! 🎉',
-    validWeightErr: 'Please enter a valid target weight.',
-    calorieErr: 'Daily calorie goal must be at least 800 kcal.',
-    confirmTargetDate: 'Confirm Target Date',
-    done: 'Done',
-  },
-  ru: {
-    setGoal: 'Установите цель',
-    trackProgress: 'Отслеживайте прогресс и оставайтесь мотивированными.',
-    weightGoal: 'Целевой вес',
-    current: 'Текущий: ',
-    targetWeightLabel: 'Целевой вес (кг)',
-    maintenance: 'Поддержание веса',
-    remainingToLoss: 'Осталось {diff} кг до цели',
-    remainingToGain: 'Нужно набрать {diff} кг до цели',
-    goalProgress: 'Прогресс цели',
-    completed: 'завершено',
-    remainingDescLoss: 'Осталось {diff} кг до вашей цели.',
-    remainingDescGain: 'Нужно набрать {diff} кг до вашей цели.',
-    atTargetWeight: 'Вы находитесь точно в целевом весе!',
-    dailyCalorieTarget: 'Дневная цель калорий',
-    calorieTargetDesc: 'Настройте дневную цель или используйте наши рекомендации на основе целевого веса.',
-    weeklyChangeRate: 'Скорость изменения веса',
-    kgWk: '{rate} кг/нед',
-    dailyCaloriesLabel: 'Дневные калории (ккал)',
-    suggested: 'Рекомендуется',
-    timeline: 'Сроки',
-    timelineDesc: 'Выберите целевую дату для расчета ваших ежедневных задач.',
-    targetDateLabel: 'Целевая дата',
-    daysRemainingDesc: 'До вашей цели осталось примерно {days} дней.',
-    motivationQuote: '"Каждый маленький шаг приближает вас к цели."',
-    motivationAuthor: 'Фитнес-путешествие',
-    resetGoal: 'Сбросить цель',
-    saveGoal: 'Сохранить цель',
+const SmoothCircularProgress = ({ percentage, isDark }: { percentage: number; isDark: boolean }) => {
+  const size = SCREEN_WIDTH * 0.65; // slightly smaller to fit card
+  const strokeWidth = 24;
+  const radius = size / 2;
+  const angle = Math.min(Math.max(percentage / 100, 0), 1) * 360;
+  
+  const color = '#7EB93C';
+  const unfilledColor = isDark ? '#2A3A1E' : '#E5EDE0';
 
-    resetMsg: 'Настройки целей сброшены по умолчанию.',
-    saveSuccess: 'Цели успешно сохранены! 🎉',
-    validWeightErr: 'Пожалуйста, введите корректный целевой вес.',
-    calorieErr: 'Дневная цель калорий должна быть не менее 800 ккал.',
-    confirmTargetDate: 'Подтвердить дату',
-    done: 'Готово',
-  },
-  uz: {
-    setGoal: 'Maqsadingizni belgilang',
-    trackProgress: 'Rivojlanishingizni kuzatib boring va motivatsiyada bo\'ling.',
-    weightGoal: 'Vazn maqsadi',
-    current: 'Hozirgi: ',
-    targetWeightLabel: 'Maqsadli vazn (kg)',
-    maintenance: 'Vaznni saqlash maqsadi',
-    remainingToLoss: 'Maqsadgacha {diff} kg qoldi',
-    remainingToGain: 'Maqsadgacha {diff} kg semirish kerak',
-    goalProgress: 'Maqsad progressi',
-    completed: 'bajarildi',
-    remainingDescLoss: 'Maqsadingizga erishish uchun {diff} kg qoldi.',
-    remainingDescGain: 'Maqsadingizga erishish uchun {diff} kg semirishingiz kerak.',
-    atTargetWeight: 'Siz ayni maqsad qilgan vazndasiz!',
-    dailyCalorieTarget: 'Kunlik kaloriya maqsadi',
-    calorieTargetDesc: 'Kunlik maqsadingizni sozlang yoki maqsadli vazningizga asoslangan tavsiyamizdan foydalaning.',
-    weeklyChangeRate: 'Haftalik o\'zgarish tezligi',
-    kgWk: '{rate} kg/hafta',
-    dailyCaloriesLabel: 'Kunlik kaloriya (kkal)',
-    suggested: 'Tavsiya etilgan',
-    timeline: 'Muddat',
-    timelineDesc: 'Kunlik majburiyatingizni hisoblash uchun maqsadli tugatish sanasini tanlang.',
-    targetDateLabel: 'Maqsadli sana',
-    daysRemainingDesc: 'Maqsadingizga taxminan {days} kun qoldi.',
-    motivationQuote: '"Har bir kichik qadam sizni maqsadingizga yaqinlashtiradi."',
-    motivationAuthor: 'Salomatlik yo\'li',
-    resetGoal: 'Maqsadni tiklash',
-    saveGoal: 'Maqsadni saqlash',
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginVertical: 20 }}>
+      {/* Base background ring */}
+      <View style={{ position: 'absolute', width: size, height: size, borderRadius: radius, borderWidth: strokeWidth, borderColor: unfilledColor }} />
 
-    resetMsg: 'Maqsad sozlamalari boshlang\'ich holatga qaytarildi.',
-    saveSuccess: 'Maqsadlar muvaffaqiyatli saqlandi! 🎉',
-    validWeightErr: 'Iltimos, to\'g\'ri maqsadli vaznni kiriting.',
-    calorieErr: 'Kunlik kaloriya maqsadi kamida 800 kkal bo\'lishi kerak.',
-    confirmTargetDate: 'Sanani tasdiqlash',
-    done: 'Tayyor',
-  }
+      {/* Right half container */}
+      <View style={{ position: 'absolute', width: radius, height: size, right: 0, overflow: 'hidden' }}>
+        <View style={{
+          width: size, height: size, borderRadius: radius, borderWidth: strokeWidth,
+          borderColor: 'transparent', borderTopColor: color, borderRightColor: color,
+          position: 'absolute', right: 0,
+          transform: [{ rotate: '-135deg' }, { rotate: `${Math.min(angle, 180)}deg` }]
+        }} />
+      </View>
+
+      {/* Left half container */}
+      {angle > 180 && (
+        <View style={{ position: 'absolute', width: radius, height: size, left: 0, overflow: 'hidden' }}>
+          <View style={{
+            width: size, height: size, borderRadius: radius, borderWidth: strokeWidth,
+            borderColor: 'transparent', borderBottomColor: color, borderLeftColor: color,
+            position: 'absolute', left: 0,
+            transform: [{ rotate: '-135deg' }, { rotate: `${angle - 180}deg` }]
+          }} />
+        </View>
+      )}
+
+      <View style={{ alignItems: 'center' }}>
+        <Text style={{ fontSize: 48, fontWeight: '800', color: isDark ? '#FAFCF8' : '#1A1A1A' }}>
+          {percentage}%
+        </Text>
+        <Text style={{ fontSize: 16, fontWeight: '600', color: isDark ? '#9AA88E' : '#666', marginTop: 4 }}>
+          Remaining
+        </Text>
+      </View>
+    </View>
+  );
 };
 
-export default function GoalSettingScreen() {
+import { TextInput } from 'react-native';
+import { supabase } from '@/constants/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export default function GoalScreen() {
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [goalPercentage, setGoalPercentage] = useState(0); 
   const [appTheme, setAppTheme] = useState(MockStore.appTheme);
-  const [language, setLanguage] = useState(MockStore.language);
-
-  const [currentWeight, setCurrentWeight] = useState<number>(MockStore.currentWeight);
-  const [startingWeight, setStartingWeight] = useState<number>(MockStore.startingWeight);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const insets = useSafeAreaInsets();
-
-  // Load goal data from Supabase on mount
-  useEffect(() => {
-    async function loadGoalData() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('target_weight, daily_calorie_goal, weekly_weight_goal, target_date, current_weight, starting_weight')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (profile) {
-            const tw = parseFloat(profile.target_weight) || 82;
-            const dcg = parseFloat(profile.daily_calorie_goal) || 1900;
-            const wwg = parseFloat(profile.weekly_weight_goal) || 0.5;
-            const td = profile.target_date ? new Date(profile.target_date) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-            const cw = parseFloat(profile.current_weight) || 85;
-            const sw = parseFloat(profile.starting_weight) || 88;
-
-            setTargetWeight(tw.toString());
-            setDailyCalorieGoal(dcg.toString());
-            setWeeklyWeightGoal(wwg);
-            setTargetDate(td);
-            setCurrentWeight(cw);
-            setStartingWeight(sw);
-
-            // Sync MockStore with loaded data
-            MockStore.update({
-              targetWeight: tw,
-              dailyCalorieGoal: dcg,
-              weeklyWeightGoal: wwg,
-              targetDate: td,
-              currentWeight: cw,
-              startingWeight: sw,
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to load goal data from Supabase:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadGoalData();
-  }, []);
-
-  // Subscribe to MockStore updates
+  
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [activeGoals, setActiveGoals] = useState<any[]>([]);
+  
+  const [configuringGoal, setConfiguringGoal] = useState<any>(null);
+  const [goalValue, setGoalValue] = useState('');
+  const [weightChange, setWeightChange] = useState(0);
+  
   useEffect(() => {
     return MockStore.subscribe(() => {
-      setTargetWeight(MockStore.targetWeight.toString());
-      setDailyCalorieGoal(MockStore.dailyCalorieGoal.toString());
-      setWeeklyWeightGoal(MockStore.weeklyWeightGoal);
-      setTargetDate(MockStore.targetDate);
-      setCurrentWeight(MockStore.currentWeight);
-      setStartingWeight(MockStore.startingWeight);
       setAppTheme(MockStore.appTheme);
-      setLanguage(MockStore.language);
     });
   }, []);
 
+  const syncToSupabase = async (newGoals: any[]) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        const { data: existing } = await supabase
+          .from('diary_entries')
+          .select('id')
+          .eq('user_id', userData.user.id)
+          .eq('meal_type', 'active_goals')
+          .maybeSingle();
+
+        if (existing?.id) {
+          await supabase.from('diary_entries').update({ items: JSON.stringify(newGoals) }).eq('id', existing.id);
+        } else {
+          await supabase.from('diary_entries').insert({
+            user_id: userData.user.id,
+            date: '2099-12-31',
+            meal_type: 'active_goals',
+            items: JSON.stringify(newGoals),
+            calories: 0,
+            carbs: 0,
+            protein: 0,
+            fat: 0,
+          });
+        }
+      }
+    } catch (e) {
+      console.log('Error syncing goals to Supabase:', e);
+    }
+  };
+
+  // Fetch active goals from Supabase or AsyncStorage
+  useEffect(() => {
+    const loadGoals = async () => {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const { data, error } = await supabase
+            .from('diary_entries')
+            .select('items')
+            .eq('user_id', userData.user.id)
+            .eq('meal_type', 'active_goals')
+            .maybeSingle();
+            
+          if (data && data.items) {
+            setActiveGoals(JSON.parse(data.items));
+            return;
+          }
+        }
+        
+        // Fallback
+        const stored = await AsyncStorage.getItem('active_goals');
+        if (stored) setActiveGoals(JSON.parse(stored));
+      } catch (e) {}
+    };
+    loadGoals();
+  }, []);
+
+  // Fetch diary entries and calculate weight change
+  useEffect(() => {
+    const fetchStats = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .select('date, calories, meal_type')
+        .eq('user_id', user.id);
+
+      if (data && !error) {
+        let totalEaten = 0;
+        let totalSteps = 0;
+        let dates = new Set();
+
+        data.forEach((entry: any) => {
+          dates.add(entry.date);
+          if (entry.meal_type === 'steps_history') {
+            totalSteps += (entry.calories || 0); // steps count is stored in calories for steps_history
+          } else {
+            totalEaten += (entry.calories || 0);
+          }
+        });
+
+        const daysTracked = dates.size || 1;
+        const BMR = 2000;
+        const caloriesBurnedFromSteps = totalSteps * 0.04;
+        const totalBurned = (daysTracked * BMR) + caloriesBurnedFromSteps;
+        
+        // 1 kg = ~7700 kcal. 
+        // If netCalories < 0, they lost weight (negative weightChange)
+        const netCalories = totalEaten - totalBurned;
+        const changeKg = netCalories / 7700;
+        
+        setWeightChange(changeKg);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  // Calculate Goal Percentage based on the first active goal
+  useEffect(() => {
+    if (activeGoals.length > 0) {
+      const mainGoal = activeGoals[0];
+      const targetVal = parseFloat(mainGoal.value) || 1;
+      
+      let progress = 0;
+      if (mainGoal.id === '1') {
+        // Lose Weight
+        // changeKg is negative if they lost weight
+        const lost = Math.max(0, -weightChange);
+        progress = (lost / targetVal) * 100;
+      } else if (mainGoal.id === '2') {
+        // Gain Weight
+        // changeKg is positive if they gained weight
+        const gained = Math.max(0, weightChange);
+        progress = (gained / targetVal) * 100;
+      } else {
+        // Other goals just show 0 for now unless implemented
+        progress = 0;
+      }
+      
+      setGoalPercentage(Math.min(Math.round(progress), 100));
+    } else {
+      setGoalPercentage(0);
+    }
+  }, [activeGoals, weightChange]);
+
+  const insets = useSafeAreaInsets();
   const systemColorScheme = useColorScheme();
   const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
-  const t = translations[language] || translations.en;
 
-  // Theme Colors
   const theme = {
     background: isDark ? '#0F140A' : '#F7FAF3',
     cardBackground: isDark ? '#171E10' : '#FFFFFF',
     cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
-    textPrimary: isDark ? '#FAFCF8' : '#1A2310',
-    textBrand: isDark ? '#8CC33F' : '#3A5C18',
-    textMuted: isDark ? '#9AA88E' : '#6B785E',
-    badgeBackground: isDark ? '#23321A' : '#F0FAE4',
-    badgeBorder: isDark ? '#374B2A' : '#C8E8A0',
-    inputText: isDark ? '#FAFCF8' : '#1A2310',
-    inputBackground: isDark ? '#171E10' : '#FFFFFF',
-    inputOutline: isDark ? '#2A3A1E' : '#EBF2E5',
-    suggestedBoxBg: isDark ? '#23321A' : '#F5F5F5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A1A1A',
+    textMuted: isDark ? '#6B785E' : '#888',
+    activeBg: '#7EB93C',
+    activeText: '#FFFFFF',
+    borderBottom: isDark ? '#1F2A16' : '#EBF2E5',
+    overlay: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)'
   };
 
-  // Goal Settings State (Synced with MockStore)
-  const [targetWeight, setTargetWeight] = useState<string>(MockStore.targetWeight.toString());
-  const [dailyCalorieGoal, setDailyCalorieGoal] = useState<string>(MockStore.dailyCalorieGoal.toString());
-  const [weeklyWeightGoal, setWeeklyWeightGoal] = useState<number>(MockStore.weeklyWeightGoal);
-  const [targetDate, setTargetDate] = useState<Date>(MockStore.targetDate);
-
-  // UI States
-  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
-  const [snackbarVisible, setSnackbarVisible] = useState<boolean>(false);
-  const [snackbarMessage, setSnackbarMessage] = useState<string>('');
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-
-  const parsedTargetWeight = parseFloat(targetWeight) || 0;
-  const weightDiff = currentWeight - parsedTargetWeight;
-  const isLoss = weightDiff >= 0;
-  const absWeightDiff = Math.abs(weightDiff);
-
-  const totalGoalWeightChange = startingWeight - parsedTargetWeight;
-  const progressPercent = totalGoalWeightChange > 0
-    ? Math.min(Math.max(((startingWeight - currentWeight) / totalGoalWeightChange) * 100, 0), 100)
-    : 0;
-
-  const getDaysRemaining = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const target = new Date(targetDate);
-    target.setHours(0, 0, 0, 0);
-    const diffTime = target.getTime() - today.getTime();
-    return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-  };
-  const daysRemaining = getDaysRemaining();
-
-  const calculateSuggestedCalories = () => {
-    const baseTdee = 2400;
-    if (parsedTargetWeight === currentWeight) {
-      return baseTdee;
-    }
-    const weightChangeFactor = isLoss ? -1 : 1;
-    const dailyDeficit = (weeklyWeightGoal * 7700) / 7;
-    const suggestion = baseTdee + (weightChangeFactor * dailyDeficit);
-    return Math.round(suggestion);
-  };
-  const suggestedCalories = calculateSuggestedCalories();
-
-  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (selectedDate) {
-      setTargetDate(selectedDate);
-    }
-  };
-
-  const adjustTargetWeight = (amount: number) => {
-    const current = parseFloat(targetWeight) || 0;
-    const newVal = Math.max(30, Math.min(250, current + amount));
-    setTargetWeight((Math.round(newVal * 10) / 10).toString());
+  const handleSelectGoal = (goal: any) => {
+    setConfiguringGoal(goal);
+    setGoalValue(goal.defaultVal);
   };
 
   const handleSaveGoal = async () => {
-    if (parsedTargetWeight <= 0) {
-      setSnackbarMessage(t.validWeightErr);
-      setSnackbarVisible(true);
-      return;
-    }
-    if ((parseFloat(dailyCalorieGoal) || 0) < 800) {
-      setSnackbarMessage(t.calorieErr);
-      setSnackbarVisible(true);
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const parsedCalories = parseFloat(dailyCalorieGoal) || 1900;
-
-      // Save to MockStore
-      MockStore.update({
-        targetWeight: parsedTargetWeight,
-        dailyCalorieGoal: parsedCalories,
-        weeklyWeightGoal: weeklyWeightGoal,
-        targetDate: targetDate,
-      });
-
-      // Save to Supabase profiles table
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('profiles').update({
-          target_weight: parsedTargetWeight,
-          daily_calorie_goal: parsedCalories,
-          weekly_weight_goal: weeklyWeightGoal,
-          target_date: targetDate.toISOString(),
-        }).eq('id', user.id);
+    if (configuringGoal && goalValue) {
+      const newGoal = { ...configuringGoal, value: goalValue };
+      const exists = activeGoals.findIndex(g => g.id === newGoal.id);
+      
+      let updated = [...activeGoals];
+      if (exists >= 0) {
+        updated[exists] = newGoal;
+      } else {
+        updated.push(newGoal);
       }
-
-      setSnackbarMessage(t.saveSuccess);
-      setSnackbarVisible(true);
-    } catch (err) {
-      console.warn('Failed to save goals to DB:', err);
-      setSnackbarMessage(t.saveSuccess);
-      setSnackbarVisible(true);
-    } finally {
-      setIsSaving(false);
+      setActiveGoals(updated);
+      await AsyncStorage.setItem('active_goals', JSON.stringify(updated));
+      syncToSupabase(updated);
     }
+    setConfiguringGoal(null);
+    setModalVisible(false);
   };
 
-  const handleResetGoal = () => {
-    const defaultDate = new Date();
-    defaultDate.setDate(defaultDate.getDate() + 90);
-
-    setTargetWeight('82');
-    setDailyCalorieGoal('1900');
-    setWeeklyWeightGoal(0.5);
-    setTargetDate(defaultDate);
-
-    MockStore.update({
-      targetWeight: 82,
-      dailyCalorieGoal: 1900,
-      weeklyWeightGoal: 0.5,
-      targetDate: defaultDate,
-    });
-
-    setSnackbarMessage(t.resetMsg);
-    setSnackbarVisible(true);
+  const handleRemoveGoal = async (id: string) => {
+    const updated = activeGoals.filter(g => g.id !== id);
+    setActiveGoals(updated);
+    await AsyncStorage.setItem('active_goals', JSON.stringify(updated));
+    syncToSupabase(updated);
   };
 
-  const formatDateString = (date: Date) => {
-    return date.toLocaleDateString(language === 'uz' ? 'uz-UZ' : language === 'ru' ? 'ru-RU' : 'en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+  const openModal = () => {
+    setConfiguringGoal(null);
+    setModalVisible(true);
   };
 
   return (
-    <PaperProvider>
-      <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-        {isLoading ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#7EB93C" />
+    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: Math.max(10, insets.top) }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      
+      {/* Month Selector */}
+      <Animated.View entering={FadeInDown.duration(400)} style={styles.monthSelectorWrapper}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.monthScroll}
+        >
+          {MONTHS.map((month, idx) => {
+            const isActive = selectedMonth === idx;
+            return (
+              <TouchableOpacity
+                key={month}
+                onPress={() => setSelectedMonth(idx)}
+                style={[
+                  styles.monthBtn,
+                  { 
+                    backgroundColor: isActive ? theme.activeBg : theme.cardBackground, 
+                    borderColor: isActive ? theme.activeBg : theme.cardBorder 
+                  }
+                ]}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.monthSubtitle, { color: isActive ? 'rgba(255,255,255,0.8)' : theme.textMuted }]}>
+                  2025
+                </Text>
+                <Text style={[styles.monthText, { color: isActive ? '#FFF' : theme.textPrimary }]}>
+                  {month}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </Animated.View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        
+        {/* Progress Card (like search.tsx) */}
+        <Animated.View 
+          entering={FadeInDown.duration(400).delay(100)} 
+          style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+        >
+          {/* Dynamic Weight Info */}
+          <View style={styles.weightInfoContainer}>
+            <Text style={[styles.weightChangeText, { color: weightChange < 0 ? theme.activeBg : '#FF4D4F' }]}>
+              {weightChange > 0 ? '+' : ''}{weightChange.toFixed(2)} kg
+            </Text>
+            <Text style={[styles.weightChangeLabel, { color: theme.textMuted }]}>
+              Calculated from Calories Eaten & Steps
+            </Text>
           </View>
-        ) : (
-          <>
-            <StatusBar style={isDark ? "light" : "dark"} />
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={{ flex: 1 }}
-            >
-              <ScrollView
-                contentContainerStyle={styles.scroll}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                {/* Top Header Section */}
-                <Animated.View entering={FadeInDown.duration(500)} style={styles.headerSection}>
-                  <View style={styles.flagIconContainer}>
-                    <View style={[styles.flagIconInner, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}>
-                      <Ionicons name="flag" size={32} color="#7EB93C" />
-                    </View>
-                    <View style={styles.pulseRing} />
-                  </View>
-                  <Text style={[styles.title, { color: theme.textBrand }]}>{t.setGoal}</Text>
-                  <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t.trackProgress}</Text>
-                </Animated.View>
 
-                {/* Goal Card */}
-                <Animated.View
-                  entering={FadeInDown.duration(500).delay(100)}
-                  style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-                >
-                  <View style={styles.cardHeader}>
-                    <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.weightGoal}</Text>
-                    <View style={[styles.currentWeightBadge, { backgroundColor: theme.background, borderColor: theme.cardBorder }]}>
-                      <Text style={[styles.currentWeightLabel, { color: theme.textMuted }]}>{t.current}</Text>
-                      <Text style={[styles.currentWeightValue, { color: theme.textBrand }]}>{currentWeight} kg</Text>
-                    </View>
-                  </View>
+          {/* Progress Circle */}
+          <SmoothCircularProgress percentage={goalPercentage} isDark={isDark} />
+        </Animated.View>
 
-                  {/* Target Weight Inputs with Stepper */}
-                  <View style={styles.weightInputRow}>
-                    <TouchableOpacity
-                      style={[styles.stepperButton, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
-                      onPress={() => adjustTargetWeight(-0.5)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="remove" size={24} color="#7EB93C" />
-                    </TouchableOpacity>
-
-                    <View style={styles.inputContainer}>
-                      <PaperTextInput
-                        mode="outlined"
-                        label={t.targetWeightLabel}
-                        value={targetWeight}
-                        onChangeText={setTargetWeight}
-                        keyboardType="decimal-pad"
-                        activeOutlineColor="#7EB93C"
-                        outlineColor={theme.inputOutline}
-                        textColor={theme.inputText}
-                        theme={{ colors: { background: theme.inputBackground } }}
-                        style={styles.textInput}
-                        dense
-                      />
-                    </View>
-
-                    <TouchableOpacity
-                      style={[styles.stepperButton, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
-                      onPress={() => adjustTargetWeight(0.5)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="add" size={24} color="#7EB93C" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Automatic Difference Callout */}
-                  <Animated.View layout={Layout.springify()} style={[styles.diffContainer, { backgroundColor: theme.badgeBackground }]}>
-                    <Ionicons
-                      name={isLoss ? "arrow-down-circle" : "arrow-up-circle"}
-                      size={20}
-                      color="#7EB93C"
-                    />
-                    <Text style={[styles.diffText, { color: theme.textBrand }]}>
-                      {absWeightDiff === 0
-                        ? t.maintenance
-                        : isLoss
-                          ? t.remainingToLoss.replace('{diff}', absWeightDiff.toFixed(1))
-                          : t.remainingToGain.replace('{diff}', absWeightDiff.toFixed(1))
-                      }
-                    </Text>
-                  </Animated.View>
-                </Animated.View>
-
-                {/* Progress Section */}
-                <Animated.View
-                  entering={FadeInDown.duration(500).delay(200)}
-                  style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-                >
-                  <View style={styles.progressHeader}>
-                    <Text style={[styles.progressTitle, { color: theme.textBrand }]}>{t.goalProgress}</Text>
-                    <Text style={styles.progressPctText}>{Math.round(progressPercent)}% {t.completed}</Text>
-                  </View>
-
-                  <View style={[styles.progressBarBackground, { backgroundColor: theme.badgeBackground }]}>
-                    <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]}>
-                      {progressPercent > 0 && <View style={styles.progressBarThumb} />}
-                    </View>
-                  </View>
-
-                  <View style={styles.progressFooter}>
-                    <Ionicons name="information-circle-outline" size={16} color={theme.textMuted} />
-                    <Text style={[styles.progressFooterText, { color: theme.textMuted }]}>
-                      {absWeightDiff === 0
-                        ? t.atTargetWeight
-                        : isLoss
-                          ? t.remainingDescLoss.replace('{diff}', absWeightDiff.toFixed(1))
-                          : t.remainingDescGain.replace('{diff}', absWeightDiff.toFixed(1))
-                      }
-                    </Text>
-                  </View>
-                </Animated.View>
-
-                {/* Calorie Goal Section */}
-                <Animated.View
-                  entering={FadeInDown.duration(500).delay(300)}
-                  style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-                >
-                  <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.dailyCalorieTarget}</Text>
-                  <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t.calorieTargetDesc}</Text>
-
-                  <Text style={[styles.subLabel, { color: theme.textBrand }]}>{t.weeklyChangeRate}</Text>
-                  <View style={styles.chipContainer}>
-                    {[0.25, 0.5, 0.75, 1.0].map((rate) => {
-                      const isSelected = weeklyWeightGoal === rate;
-                      return (
-                        <TouchableOpacity
-                          key={rate}
-                          style={[styles.chip, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }, isSelected && styles.chipActive]}
-                          onPress={() => setWeeklyWeightGoal(rate)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={[styles.chipText, { color: theme.textMuted }, isSelected && styles.chipTextActive]}>
-                            {t.kgWk.replace('{rate}', rate.toString())}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  {/* Calorie Goal Input */}
-                  <View style={styles.calorieInputRow}>
-                    <View style={styles.flexInput}>
-                      <PaperTextInput
-                        mode="outlined"
-                        label={t.dailyCaloriesLabel}
-                        value={dailyCalorieGoal}
-                        onChangeText={setDailyCalorieGoal}
-                        keyboardType="number-pad"
-                        activeOutlineColor="#7EB93C"
-                        outlineColor={theme.inputOutline}
-                        textColor={theme.inputText}
-                        theme={{ colors: { background: theme.inputBackground } }}
-                        style={styles.textInput}
-                      />
-                    </View>
-                    <View style={[styles.suggestedBox, { backgroundColor: theme.suggestedBoxBg, borderColor: theme.cardBorder }]}>
-                      <Text style={[styles.suggestedLabel, { color: theme.textMuted }]}>{t.suggested}</Text>
-                      <Text style={styles.suggestedValue}>{suggestedCalories} kcal</Text>
-                    </View>
-                  </View>
-                </Animated.View>
-
-                {/* Timeline Section */}
-                <Animated.View
-                  entering={FadeInDown.duration(500).delay(400)}
-                  style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-                >
-                  <Text style={[styles.cardTitle, { color: theme.textBrand }]}>{t.timeline}</Text>
-                  <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{t.timelineDesc}</Text>
-
-                  <TouchableOpacity
-                    style={[styles.datePickerTrigger, { backgroundColor: theme.badgeBackground, borderColor: theme.badgeBorder }]}
-                    onPress={() => setShowDatePicker(prev => !prev)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.dateInfo}>
-                      <Ionicons name="calendar" size={22} color="#7EB93C" />
-                      <View style={{ marginLeft: 12 }}>
-                        <Text style={[styles.datePickerLabel, { color: theme.textMuted }]}>{t.targetDateLabel}</Text>
-                        <Text style={styles.datePickerValue}>{formatDateString(targetDate)}</Text>
-                      </View>
-                    </View>
-                    <Ionicons name={showDatePicker ? "chevron-up" : "chevron-down"} size={20} color="#7EB93C" />
-                  </TouchableOpacity>
-
-                  {/* Web Native Date input backup */}
-                  {Platform.OS === 'web' && showDatePicker && (
-                    <View style={[styles.webDateContainer, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-                      <input
-                        type="date"
-                        value={targetDate.toISOString().split('T')[0]}
-                        min={new Date().toISOString().split('T')[0]}
-                        onChange={(e) => {
-                          if (e.target.value) setTargetDate(new Date(e.target.value));
-                          setShowDatePicker(false);
-                        }}
-                        style={StyleSheet.flatten([styles.webDatePicker, { borderColor: theme.badgeBorder, color: '#7EB93C', backgroundColor: theme.suggestedBoxBg }]) as any}
-                      />
-                      <TouchableOpacity
-                        style={styles.webDateCloseBtn}
-                        onPress={() => setShowDatePicker(false)}
-                      >
-                        <Text style={styles.webDateCloseText}>{t.done}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {/* Native Mobile Date Picker */}
-                  {Platform.OS !== 'web' && showDatePicker && (
-                    <View style={[styles.iosDatePickerContainer, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-                      <DateTimePicker
-                        value={targetDate}
-                        mode="date"
-                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                        minimumDate={new Date()}
-                        onChange={handleDateChange}
-                        accentColor="#7EB93C"
-                        themeVariant={isDark ? 'dark' : 'light'}
-                      />
-                      {Platform.OS === 'ios' && (
-                        <TouchableOpacity
-                          style={styles.iosConfirmButton}
-                          onPress={() => setShowDatePicker(false)}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={styles.iosConfirmButtonText}>{t.confirmTargetDate}</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-
-                  {/* Days remaining badge */}
-                  <View style={[styles.daysRemainingContainer, { backgroundColor: theme.badgeBackground }]}>
-                    <Ionicons name="time-outline" size={20} color="#7EB93C" />
-                    <Text style={[styles.daysRemainingText, { color: theme.textBrand }]}>
-                      {t.daysRemainingDesc.replace('{days}', daysRemaining.toString())}
-                    </Text>
-                  </View>
-                </Animated.View>
-
-                {/* Motivation Card */}
-                <Animated.View
-                  entering={FadeInDown.duration(500).delay(450)}
-                  style={styles.motivationCard}
-                >
-                  <View style={styles.quoteIconContainer}>
-                    <MaterialCommunityIcons name="format-quote-close" size={24} color="#EBF2E5" style={{ opacity: 0.3 }} />
-                  </View>
-                  <Text style={styles.motivationText}>{t.motivationQuote}</Text>
-                  <View style={styles.motivationFooter}>
-                    <View style={styles.motivationDot} />
-                    <Text style={styles.motivationAuthor}>{t.motivationAuthor}</Text>
-                  </View>
-                </Animated.View>
-
-                {/* Buttons Row */}
-                <Animated.View
-                  entering={FadeInDown.duration(500).delay(500)}
-                  style={styles.buttonRow}
-                >
-                  <TouchableOpacity
-                    style={[styles.resetButton, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-                    onPress={handleResetGoal}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.resetButtonText}>{t.resetGoal}</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
-                    onPress={handleSaveGoal}
-                    disabled={isSaving}
-                    activeOpacity={0.85}
-                  >
-                    {isSaving ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={styles.saveButtonText}>{t.saveGoal}</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </Animated.View>
-              </ScrollView>
-            </KeyboardAvoidingView>
-
-            <Portal>
-              <Snackbar
-                visible={snackbarVisible}
-                onDismiss={() => setSnackbarVisible(false)}
-                duration={2500}
-                action={{
-                  label: t.done,
-                  onPress: () => setSnackbarVisible(false),
-                  textColor: '#7EB93C',
-                }}
-                style={styles.snackbar}
-              >
-                {snackbarMessage}
-              </Snackbar>
-            </Portal>
-          </>
+        {/* Active Goals List */}
+        {activeGoals.length > 0 && (
+          <Animated.View entering={FadeInDown.duration(400).delay(150)} style={styles.activeGoalsContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>Active Targets</Text>
+            {activeGoals.map(goal => (
+              <View key={goal.id} style={[styles.activeGoalCard, { backgroundColor: theme.cardBackground }]}>
+                <View style={[styles.goalIconBg, { backgroundColor: goal.color + '15' }]}>
+                  <Ionicons name={goal.icon} size={28} color={goal.color} />
+                </View>
+                <View style={styles.goalTextContainer}>
+                  <Text style={[styles.goalTitle, { color: theme.textPrimary }]}>{goal.title}</Text>
+                  <Text style={[styles.goalValue, { color: theme.textMuted }]}>
+                    Target: <Text style={{ color: theme.textPrimary, fontWeight: '800' }}>{goal.value} {goal.unit}</Text>
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => handleRemoveGoal(goal.id)} style={[styles.removeBtn, { backgroundColor: '#FF4D4F15' }]}>
+                  <Ionicons name="trash-outline" size={20} color="#FF4D4F" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </Animated.View>
         )}
-      </View>
-    </PaperProvider>
+
+        {/* Add Goal Button */}
+        <Animated.View entering={FadeInDown.duration(400).delay(200)} style={{ width: '100%' }}>
+          <TouchableOpacity 
+            style={[styles.addBtn, { backgroundColor: theme.activeBg }]} 
+            activeOpacity={0.8}
+            onPress={openModal}
+          >
+            <Ionicons name="add-circle-outline" size={24} color="#FFF" style={{ marginRight: 8 }} />
+            <Text style={styles.addBtnText}>Add Goal</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+      </ScrollView>
+
+      {/* Add Goal Modal */}
+      <Modal visible={isModalVisible} transparent animationType="slide">
+        <View style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+            
+            {!configuringGoal ? (
+              <>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Select a Goal</Text>
+                  <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeBtn}>
+                    <Ionicons name="close" size={24} color={theme.textMuted} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {GOAL_OPTIONS.map(goal => (
+                    <TouchableOpacity
+                      key={goal.id}
+                      style={[styles.goalOption, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
+                      activeOpacity={0.7}
+                      onPress={() => handleSelectGoal(goal)}
+                    >
+                      <View style={[styles.goalIconBg, { backgroundColor: goal.color + '20' }]}>
+                        <Ionicons name={goal.icon as any} size={24} color={goal.color} />
+                      </View>
+                      <Text style={[styles.goalOptionText, { color: theme.textPrimary }]}>{goal.title}</Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            ) : (
+              <>
+                <View style={styles.modalHeader}>
+                  <TouchableOpacity onPress={() => setConfiguringGoal(null)} style={styles.backBtn}>
+                    <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
+                  </TouchableOpacity>
+                  <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Set Target</Text>
+                  <View style={{ width: 24 }} /> 
+                </View>
+
+                <View style={{ alignItems: 'center', marginVertical: 32 }}>
+                  <View style={[styles.goalIconBg, { backgroundColor: configuringGoal.color + '20', width: 64, height: 64, borderRadius: 32, marginBottom: 16 }]}>
+                    <Ionicons name={configuringGoal.icon as any} size={32} color={configuringGoal.color} />
+                  </View>
+                  <Text style={[styles.configuringTitle, { color: theme.textPrimary }]}>{configuringGoal.title}</Text>
+                  
+                  <View style={styles.inputContainer}>
+                    <TextInput 
+                      style={[styles.valueInput, { color: theme.textPrimary, borderBottomColor: theme.cardBorder }]} 
+                      value={goalValue} 
+                      onChangeText={setGoalValue} 
+                      keyboardType="numeric"
+                      autoFocus
+                    />
+                    <Text style={[styles.unitText, { color: theme.textMuted }]}>{configuringGoal.unit}</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.addBtn, { backgroundColor: theme.activeBg, marginTop: 0 }]} 
+                  activeOpacity={0.8}
+                  onPress={handleSaveGoal}
+                >
+                  <Text style={styles.addBtnText}>Save Goal</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
@@ -688,399 +442,191 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scroll: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
+  monthSelectorWrapper: {
+    paddingVertical: 16,
+    marginTop: 10,
+  },
+  monthScroll: {
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  monthBtn: {
+    width: 68,
+    height: 72,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthSubtitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+    letterSpacing: 1,
+  },
+  monthText: {
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  content: {
+    padding: 24,
+    alignItems: 'center',
     paddingBottom: 40,
   },
-  headerSection: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  flagIconContainer: {
-    width: 68,
-    height: 68,
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  flagIconInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2,
-    borderWidth: 1.5,
-  },
-  pulseRing: {
-    position: 'absolute',
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#7EB93C',
-    opacity: 0.12,
-    zIndex: 1,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    marginBottom: 6,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
   card: {
+    width: '100%',
     borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
     borderWidth: 1.5,
-    shadowColor: '#3A5C18',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    padding: 24,
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  cardTitle: {
+  activeGoalsContainer: {
+    width: '100%',
+    marginBottom: 24,
+    marginTop: 10,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 16,
+    letterSpacing: 0.5,
+  },
+  activeGoalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  goalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  removeBtn: {
+    padding: 10,
+    borderRadius: 12,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    width: '100%',
+    shadowColor: '#7EB93C',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  addBtnText: {
+    color: '#FFF',
     fontSize: 18,
     fontWeight: '800',
   },
-  sectionDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 16,
-    marginTop: 2,
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
-  currentWeightBadge: {
+  modalContent: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  modalHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    marginBottom: 20,
   },
-  currentWeightLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  currentWeightValue: {
-    fontSize: 13,
+  modalTitle: {
+    fontSize: 22,
     fontWeight: '800',
   },
-  weightInputRow: {
+  closeBtn: {
+    padding: 4,
+  },
+  goalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  stepperButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    padding: 16,
+    borderRadius: 20,
     borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inputContainer: {
-    flex: 1,
-    marginHorizontal: 12,
-  },
-  textInput: {
-    height: 48,
-  },
-  diffContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    gap: 8,
-  },
-  diffText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 12,
   },
-  progressTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  progressPctText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#7EB93C',
-  },
-  progressBarBackground: {
-    height: 12,
-    borderRadius: 6,
-    overflow: 'hidden',
-    marginBottom: 14,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#7EB93C',
-    borderRadius: 6,
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  progressBarThumb: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFFFFF',
-    position: 'absolute',
-    right: 4,
-  },
-  progressFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  progressFooterText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  subLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-  },
-  chipActive: {
-    backgroundColor: '#7EB93C',
-    borderColor: '#7EB93C',
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  chipTextActive: {
-    color: '#FFFFFF',
-  },
-  calorieInputRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-  },
-  flexInput: {
-    flex: 1.3,
-  },
-  suggestedBox: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  suggestedLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  suggestedValue: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#7EB93C',
-  },
-  datePickerTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1.5,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-  },
-  dateInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  datePickerLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  datePickerValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#7EB93C',
-    marginTop: 1,
-  },
-  daysRemainingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    gap: 8,
-  },
-  daysRemainingText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  daysRemainingBold: {
-    fontWeight: '800',
-  },
-  motivationCard: {
-    backgroundColor: '#3A5C18',
+  goalIconBg: {
+    width: 48,
+    height: 48,
     borderRadius: 24,
-    padding: 22,
-    marginBottom: 20,
-    position: 'relative',
-    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  quoteIconContainer: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-  },
-  motivationText: {
+  goalOptionText: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '700',
-    color: '#EBF2E5',
-    lineHeight: 22,
-    fontStyle: 'italic',
-    zIndex: 2,
+    marginLeft: 16,
   },
-  motivationFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    gap: 6,
+  goalTextContainer: {
+    flex: 1,
+    marginLeft: 16,
   },
-  motivationDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#7EB93C',
-  },
-  motivationAuthor: {
-    fontSize: 12,
+  goalValue: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#7EB93C',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
     marginTop: 4,
   },
-  resetButton: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderRadius: 28,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
+  backBtn: {
+    padding: 4,
   },
-  resetButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  saveButton: {
-    flex: 1.5,
-    backgroundColor: '#7EB93C',
-    borderRadius: 28,
-    height: 52,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#7EB93C',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#A8D27C',
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+  configuringTitle: {
+    fontSize: 24,
     fontWeight: '800',
+    marginBottom: 24,
   },
-  snackbar: {
-    backgroundColor: '#1A2310',
-    borderRadius: 14,
-  },
-  webDateContainer: {
-    borderWidth: 1.5,
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 16,
+  inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'baseline',
   },
-  webDatePicker: {
-    flex: 1,
-    padding: 8,
-    fontSize: 14,
-    borderWidth: 1,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  webDateCloseBtn: {
-    backgroundColor: '#7EB93C',
+  valueInput: {
+    fontSize: 48,
+    fontWeight: '800',
+    borderBottomWidth: 2,
+    minWidth: 80,
+    textAlign: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
   },
-  webDateCloseText: {
-    color: '#FFFFFF',
+  unitText: {
+    fontSize: 20,
     fontWeight: '700',
-    fontSize: 13,
+    marginLeft: 12,
   },
-  iosDatePickerContainer: {
-    borderRadius: 16,
-    padding: 8,
-    borderWidth: 1.5,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  iosConfirmButton: {
-    backgroundColor: '#7EB93C',
-    paddingVertical: 12,
-    borderRadius: 14,
+  weightInfoContainer: {
     alignItems: 'center',
-    marginTop: 8,
-    shadowColor: '#7EB93C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
+    marginBottom: 10,
   },
-  iosConfirmButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+  weightChangeText: {
+    fontSize: 32,
+    fontWeight: '900',
+  },
+  weightChangeLabel: {
     fontSize: 14,
-  },
+    fontWeight: '600',
+    marginTop: 4,
+    textAlign: 'center',
+  }
 });

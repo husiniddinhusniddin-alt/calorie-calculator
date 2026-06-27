@@ -7,7 +7,7 @@ import { Pedometer } from 'expo-sensors';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated,
+  Animated as RNAnimated,
   Dimensions,
   Easing,
   Modal,
@@ -16,12 +16,14 @@ import {
   Text,
   TouchableOpacity,
   useColorScheme,
-  View
+  View,
+  Image
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
-import {
+import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -156,11 +158,11 @@ const StepRing = ({ steps, goal, isDark, t }: any) => {
 
 // ─── Spinning Loader ──────────────────────────────────────────────────────────
 const WalkingFigure = ({ color }: { color: string }) => {
-  const spin = useRef(new Animated.Value(0)).current;
+  const spin = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.timing(spin, {
+    RNAnimated.loop(
+      RNAnimated.timing(spin, {
         toValue: 1,
         duration: 900,
         easing: Easing.linear,
@@ -172,7 +174,7 @@ const WalkingFigure = ({ color }: { color: string }) => {
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
-    <Animated.View style={{
+    <RNAnimated.View style={{
       width: 48,
       height: 48,
       borderRadius: 24,
