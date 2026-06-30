@@ -13,7 +13,6 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
-  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +20,6 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/constants/supabase';
 import { MockStore } from '@/constants/store';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { height, width } = Dimensions.get('window');
 
@@ -33,10 +31,6 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-
-  const [customModalVisible, setCustomModalVisible] = useState(false);
-  const [customModalTitle, setCustomModalTitle] = useState('');
-  const [customModalMessage, setCustomModalMessage] = useState('');
 
   const handleLogin = async () => {
     if (loading) return;
@@ -64,29 +58,13 @@ export default function LoginScreen() {
     if (isValid) {
       setLoading(true);
       try {
-        const deletedStr = await AsyncStorage.getItem('deleted_accounts');
-        const deletedList = deletedStr ? JSON.parse(deletedStr) : [];
-        if (deletedList.includes(email.trim().toLowerCase())) {
-          setCustomModalTitle('Akkaunt o\'chirilgan');
-          setCustomModalMessage('Bu akkaunt butunlay o\'chirilgan. Iltimos, yangi akkaunt yarating yoki boshqa pochtadan foydalaning.');
-          setCustomModalVisible(true);
-          setLoading(false);
-          return;
-        }
-
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password.trim(),
         });
 
         if (error) {
-          let errorMsg = error.message;
-          if (errorMsg === 'Invalid login credentials') {
-            errorMsg = 'Email yoki parol xato kiritildi. Agar akkauntingizni o\'chirgan bo\'lsangiz, u butunlay yopilgan bo\'lishi mumkin.';
-          }
-          setCustomModalTitle('Xatolik');
-          setCustomModalMessage(errorMsg);
-          setCustomModalVisible(true);
+          Alert.alert('Xatolik', error.message);
           setLoading(false);
           return;
         }
@@ -170,9 +148,7 @@ export default function LoginScreen() {
           router.replace('/(tabs)');
         }
       } catch (err: any) {
-        setCustomModalTitle('Xatolik');
-        setCustomModalMessage(err.message || 'Kutilmagan xatolik yuz berdi');
-        setCustomModalVisible(true);
+        Alert.alert('Xatolik', err.message || 'Kutilmagan xatolik yuz berdi');
       } finally {
         setLoading(false);
       }
@@ -300,31 +276,6 @@ export default function LoginScreen() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Custom Alert Modal */}
-      <Modal
-        visible={customModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setCustomModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalIconContainer}>
-              <Ionicons name="alert-circle" size={40} color="#7EB93C" />
-            </View>
-            <Text style={styles.modalTitle}>{customModalTitle}</Text>
-            <Text style={styles.modalMessage}>{customModalMessage}</Text>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setCustomModalVisible(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.modalButtonText}>Tushunarli</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -488,61 +439,5 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 12,
     marginTop: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    width: '100%',
-    maxWidth: 340,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  modalIconContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#F5FAF0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#3A5C18',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  modalMessage: {
-    fontSize: 15,
-    color: '#666666',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  modalButton: {
-    backgroundColor: '#7EB93C',
-    borderRadius: 20,
-    height: 46,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });
