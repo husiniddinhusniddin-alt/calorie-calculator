@@ -229,7 +229,7 @@ export default function RegisterScreen() {
               {/* Toggle to Login */}
               <View style={styles.footerContainer}>
                 <Text style={styles.footerText}>Already have an account? </Text>
-                <TouchableOpacity onPress={() => router.back()}>
+                <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/login'))}>
                   <Text style={styles.footerLink}>Log In</Text>
                 </TouchableOpacity>
               </View>

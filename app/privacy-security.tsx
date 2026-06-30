@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, TextInput, Snackbar, Portal } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/constants/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function PrivacySecurityScreen() {
   const router = useRouter();
@@ -114,13 +115,40 @@ export default function PrivacySecurityScreen() {
           text: 'Delete', 
           style: 'destructive',
           onPress: async () => {
-            // Note: In Supabase, deleting an auth user directly from the client requires either a dedicated Postgres function (RPC) or an Edge Function due to security restrictions.
-            // For now, we will simply sign them out as a placeholder until the backend function is created.
+            // Since we can't delete auth.users from client without service_role,
+            // we simulate account deletion by wiping their public data 
+            // and scrambling their password so they can never log in again.
             try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                // Wipe user data
+                await supabase.from('diary_entries').delete().eq('user_id', user.id);
+                await supabase.from('profiles').delete().eq('id', user.id);
+                
+                // Supabase rpc orqali auth.users dan o'chirish (buning uchun Supabase'da SQL yozish kerak)
+                const { error: rpcError } = await supabase.rpc('delete_user');
+                
+                if (rpcError) {
+                  console.warn('RPC Delete User xatosi:', rpcError);
+                  // Agar RPC hali yaratilmagan bo'lsa, zaxira sifatida parolni buzamiz
+                  const scrambledPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10) + 'X9$';
+                  await supabase.auth.updateUser({ password: scrambledPassword });
+                }
+                
+                // Mahalliy xotiraga yozib qo'yish
+                if (user.email) {
+                  const deletedStr = await AsyncStorage.getItem('deleted_accounts');
+                  const deletedList = deletedStr ? JSON.parse(deletedStr) : [];
+                  if (!deletedList.includes(user.email)) {
+                    deletedList.push(user.email);
+                    await AsyncStorage.setItem('deleted_accounts', JSON.stringify(deletedList));
+                  }
+                }
+              }
               await supabase.auth.signOut();
               router.replace('/(auth)/login');
             } catch (err) {
-              console.warn('Failed to sign out:', err);
+              console.warn('Failed to delete account (sign out):', err);
             }
           }
         }
@@ -136,7 +164,7 @@ export default function PrivacySecurityScreen() {
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backBtn}
-            onPress={() => router.back()}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))}
             activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={24} color="#3A5C18" />

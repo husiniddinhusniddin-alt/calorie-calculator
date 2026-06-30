@@ -213,7 +213,7 @@ export default function RegisterDetailsScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
           <View style={styles.headerBackground}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <TouchableOpacity style={styles.backButton} onPress={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/register'))}>
               <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
             <View style={styles.patternDot} />
