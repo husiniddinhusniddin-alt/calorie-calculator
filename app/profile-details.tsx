@@ -50,6 +50,17 @@ export default function ProfileDetailsScreen() {
   const [dob, setDob] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
 
+  const [originalValues, setOriginalValues] = useState({
+    name: MockStore.name || 'User',
+    email: MockStore.email || '',
+    phone: '',
+    height: MockStore.height ? MockStore.height.toString() : '180',
+    weight: MockStore.currentWeight.toString(),
+    age: MockStore.age ? MockStore.age.toString() : '',
+    dob: '',
+    profileImage: MockStore.profileImage,
+  });
+
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -65,14 +76,34 @@ export default function ProfileDetailsScreen() {
         .eq('id', user.id)
         .maybeSingle();
       if (profile) {
-        setName(profile.name || MockStore.name);
-        setEmail(profile.email || MockStore.email);
-        setPhone(profile.phone || '');
-        setHeight((profile.height || MockStore.height || 180).toString());
-        setWeight((profile.current_weight || MockStore.currentWeight).toString());
-        setAge((profile.age || MockStore.age || '').toString());
-        setDob(profile.dob || '');
-        setProfileImage(profile.profile_image || MockStore.profileImage);
+        const fetchedName = profile.name || MockStore.name || 'User';
+        const fetchedEmail = profile.email || MockStore.email || '';
+        const fetchedPhone = profile.phone || '';
+        const fetchedHeight = (profile.height || MockStore.height || 180).toString();
+        const fetchedWeight = (profile.current_weight || MockStore.currentWeight).toString();
+        const fetchedAge = (profile.age || MockStore.age || '').toString();
+        const fetchedDob = profile.dob || '';
+        const fetchedProfileImage = profile.profile_image || MockStore.profileImage;
+
+        setName(fetchedName);
+        setEmail(fetchedEmail);
+        setPhone(fetchedPhone);
+        setHeight(fetchedHeight);
+        setWeight(fetchedWeight);
+        setAge(fetchedAge);
+        setDob(fetchedDob);
+        setProfileImage(fetchedProfileImage);
+
+        setOriginalValues({
+          name: fetchedName,
+          email: fetchedEmail,
+          phone: fetchedPhone,
+          height: fetchedHeight,
+          weight: fetchedWeight,
+          age: fetchedAge,
+          dob: fetchedDob,
+          profileImage: fetchedProfileImage,
+        });
       }
     }
     loadProfile();
@@ -137,7 +168,7 @@ export default function ProfileDetailsScreen() {
     setSnackbarVisible(true);
     setTimeout(() => {
       setIsSaving(false);
-      router.back();
+      (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'));
     }, 1500);
   };
 
@@ -161,6 +192,16 @@ export default function ProfileDetailsScreen() {
     }
   };
 
+  const hasChanges = 
+    name !== originalValues.name ||
+    email !== originalValues.email ||
+    phone !== originalValues.phone ||
+    height !== originalValues.height ||
+    weight !== originalValues.weight ||
+    age !== originalValues.age ||
+    dob !== originalValues.dob ||
+    profileImage !== originalValues.profileImage;
+
   return (
     <PaperProvider>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -173,7 +214,7 @@ export default function ProfileDetailsScreen() {
           <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.cardBorder }]}>
             <TouchableOpacity 
               style={[styles.backBtn, { backgroundColor: theme.badgeBackground, borderColor: theme.cardBorder }]}
-              onPress={() => router.back()}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))}
               activeOpacity={0.7}
             >
               <Ionicons name="arrow-back" size={24} color="#7EB93C" />
@@ -313,18 +354,20 @@ export default function ProfileDetailsScreen() {
               </View>
             </View>
 
-            <TouchableOpacity 
-              style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
-              onPress={handleSave}
-              activeOpacity={0.85}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.saveBtnText}>Save Changes</Text>
-              )}
-            </TouchableOpacity>
+            {hasChanges && (
+              <TouchableOpacity 
+                style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
+                onPress={handleSave}
+                activeOpacity={0.85}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            )}
 
           </ScrollView>
         </KeyboardAvoidingView>
