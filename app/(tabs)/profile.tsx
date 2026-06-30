@@ -77,6 +77,8 @@ export default function ProfileScreen() {
   const [height, setHeight] = useState<number | null>(MockStore.height);
   const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>(MockStore.weightUnit);
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'inches'>(MockStore.heightUnit);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -183,6 +185,8 @@ export default function ProfileScreen() {
       setHeight(MockStore.height);
       setCalorieStreak(MockStore.calorieStreak);
       setWaterStreak(MockStore.waterStreak);
+      setWeightUnit(MockStore.weightUnit);
+      setHeightUnit(MockStore.heightUnit);
     });
   }, []);
 
@@ -299,12 +303,12 @@ export default function ProfileScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{currentWeight} kg</Text>
+              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{currentWeight} {weightUnit}</Text>
               <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.weight}</Text>
             </View>
             <View style={[styles.statDividerVertical, { backgroundColor: theme.cardBorder }]} />
             <View style={styles.statBox}>
-              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{height ? `${height} cm` : '--'}</Text>
+              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{height ? `${height} ${heightUnit === 'inches' ? 'in' : heightUnit}` : '--'}</Text>
               <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.height}</Text>
             </View>
             <View style={[styles.statDividerVertical, { backgroundColor: theme.cardBorder }]} />
