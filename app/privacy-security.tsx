@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,32 +21,82 @@ export default function PrivacySecurityScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPasswordError, setCurrentPasswordError] = useState('');
+  const [newPasswordError, setNewPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
+
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
 
   const handleUpdatePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setSnackbarMsg('Please fill in all password fields.');
-      setSnackbarVisible(true);
-      return;
+    let hasError = false;
+    
+    if (!currentPassword) {
+      setCurrentPasswordError('Required');
+      hasError = true;
     }
-    if (newPassword !== confirmPassword) {
-      setSnackbarMsg('New passwords do not match.');
-      setSnackbarVisible(true);
-      return;
+    if (!newPassword) {
+      setNewPasswordError('Required');
+      hasError = true;
+    }
+    if (!confirmPassword) {
+      setConfirmPasswordError('Required');
+      hasError = true;
+    } else if (newPassword && newPassword !== confirmPassword) {
+      setConfirmPasswordError('Passwords do not match');
+      hasError = true;
     }
 
+    if (hasError) return;
+
+    setIsLoading(true);
+    setCurrentPasswordError('');
+    setNewPasswordError('');
+    setConfirmPasswordError('');
+    
+    // Add a small artificial delay so the loading state is visibly noticeable
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) {
-        setSnackbarMsg('Failed to update: ' + error.message);
+      // 1. Get the current user to find their email
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.email) {
+        setSnackbarMsg('User not found. Please log in again.');
         setSnackbarVisible(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Verify current password by attempting to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        setCurrentPasswordError('Incorrect password');
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. Current password is correct, now update to new password
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) {
+        setSnackbarMsg('Failed to update: ' + updateError.message);
+        setSnackbarVisible(true);
+        setIsLoading(false);
         return;
       }
     } catch (err) {
       console.warn('Failed to update password:', err);
+      setSnackbarMsg('An unexpected error occurred.');
+      setSnackbarVisible(true);
+      setIsLoading(false);
+      return;
     }
 
+    setIsLoading(false);
     setSnackbarMsg('Password updated successfully! 🔒');
     setSnackbarVisible(true);
     setCurrentPassword('');
@@ -103,44 +154,76 @@ export default function PrivacySecurityScreen() {
               mode="outlined"
               label="Current Password"
               value={currentPassword}
-              onChangeText={setCurrentPassword}
+              onChangeText={(text) => {
+                setCurrentPassword(text);
+                if (currentPasswordError) setCurrentPasswordError('');
+              }}
               secureTextEntry
-              activeOutlineColor="#7EB93C"
-              outlineColor="#EBF2E5"
+              activeOutlineColor={currentPasswordError ? "#FF4D4F" : "#7EB93C"}
+              outlineColor={currentPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              error={!!currentPasswordError}
               style={styles.input}
               textColor="#1A2310"
             />
+            {!!currentPasswordError && (
+              <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
+                {currentPasswordError}
+              </Text>
+            )}
 
             <TextInput
               mode="outlined"
               label="New Password"
               value={newPassword}
-              onChangeText={setNewPassword}
+              onChangeText={(text) => {
+                setNewPassword(text);
+                if (newPasswordError) setNewPasswordError('');
+              }}
               secureTextEntry
-              activeOutlineColor="#7EB93C"
-              outlineColor="#EBF2E5"
+              activeOutlineColor={newPasswordError ? "#FF4D4F" : "#7EB93C"}
+              outlineColor={newPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              error={!!newPasswordError}
               style={styles.input}
               textColor="#1A2310"
             />
+            {!!newPasswordError && (
+              <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
+                {newPasswordError}
+              </Text>
+            )}
 
             <TextInput
               mode="outlined"
               label="Confirm New Password"
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                if (confirmPasswordError) setConfirmPasswordError('');
+              }}
               secureTextEntry
-              activeOutlineColor="#7EB93C"
-              outlineColor="#EBF2E5"
+              activeOutlineColor={confirmPasswordError ? "#FF4D4F" : "#7EB93C"}
+              outlineColor={confirmPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              error={!!confirmPasswordError}
               style={styles.input}
               textColor="#1A2310"
             />
+            {!!confirmPasswordError && (
+              <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
+                {confirmPasswordError}
+              </Text>
+            )}
 
             <TouchableOpacity 
-              style={styles.updateBtn}
+              style={[styles.updateBtn, isLoading && { opacity: 0.7 }]}
               onPress={handleUpdatePassword}
               activeOpacity={0.85}
+              disabled={isLoading}
             >
-              <Text style={styles.updateBtnText}>Update Password</Text>
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.updateBtnText}>Update Password</Text>
+              )}
             </TouchableOpacity>
           </View>
 

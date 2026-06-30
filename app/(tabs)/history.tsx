@@ -101,6 +101,7 @@ export default function HistoryScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [historyData, setHistoryData] = useState<DayHistory[]>([]);
   const [weekCalories, setWeekCalories] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -123,6 +124,7 @@ export default function HistoryScreen() {
 
   const loadHistoryFromDB = async () => {
     if (!userId) return;
+    setIsLoading(true);
 
     // Build the last 7 days array
     const last7Days: string[] = [];
@@ -207,6 +209,7 @@ export default function HistoryScreen() {
       weekCals[dayOfWeek] = d.totalCalories;
     });
     setWeekCalories(weekCals);
+    setIsLoading(false);
   };
 
   useFocusEffect(
@@ -271,7 +274,7 @@ export default function HistoryScreen() {
         <Animated.View entering={FadeInDown.duration(500).delay(80)} style={[styles.chartCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
           <Text style={[styles.chartTitle, { color: theme.textMuted }]}>{t.thisWeek}</Text>
           <View style={styles.barsContainer}>
-            {weekCalories.map((cal, i) => {
+            {!isLoading && weekCalories.length > 0 ? weekCalories.map((cal, i) => {
               const hasData = cal > 0;
               const heightPct = hasData ? Math.min(cal / dailyCalorieGoal, 1.2) : 0;
               const isOver = cal > dailyCalorieGoal;
@@ -301,7 +304,16 @@ export default function HistoryScreen() {
                   </Text>
                 </View>
               );
-            })}
+            }) : Array.from({ length: 7 }).map((_, i) => (
+              <View key={`chart-skel-${i}`} style={styles.barCol}>
+                <View style={[styles.barTrack, { backgroundColor: theme.barTrackBg }]}>
+                   <View style={[styles.goalLine, { backgroundColor: isDark ? '#374B2A' : '#C8E8A0' }]} />
+                </View>
+                <Text style={[styles.barDayLabel, { color: theme.textMuted }]}>
+                  {weekLabelsMapped[i]}
+                </Text>
+              </View>
+            ))}
           </View>
           {/* Legend */}
           <View style={styles.legend}>
@@ -323,18 +335,30 @@ export default function HistoryScreen() {
         {/* Avg + Streak Stats */}
         <Animated.View entering={FadeInDown.duration(500).delay(150)} style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: theme.statCardBg, borderColor: theme.cardBorder }]}>
-            <Ionicons name="flame" size={22} color="#FF8C42" />
-            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{currentStreak}</Text>
+            <Ionicons name="flame" size={22} color={isLoading ? theme.cardBorder : "#FF8C42"} />
+            {isLoading ? (
+              <View style={[styles.skeletonBlock, { backgroundColor: theme.cardBorder, width: 30 }]} />
+            ) : (
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{currentStreak}</Text>
+            )}
             <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.dayStreak}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: theme.statCardBg, borderColor: theme.cardBorder }]}>
-            <Ionicons name="bar-chart" size={22} color="#7EB93C" />
-            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{avgKcal}</Text>
+            <Ionicons name="bar-chart" size={22} color={isLoading ? theme.cardBorder : "#7EB93C"} />
+            {isLoading ? (
+              <View style={[styles.skeletonBlock, { backgroundColor: theme.cardBorder, width: 50 }]} />
+            ) : (
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{avgKcal}</Text>
+            )}
             <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.avgKcal}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: theme.statCardBg, borderColor: theme.cardBorder }]}>
-            <Ionicons name="trophy" size={22} color="#F4C344" />
-            <Text style={[styles.statValue, { color: theme.textPrimary }]}>{goalDaysCount}/{validDays.length || 1}</Text>
+            <Ionicons name="trophy" size={22} color={isLoading ? theme.cardBorder : "#F4C344"} />
+            {isLoading ? (
+              <View style={[styles.skeletonBlock, { backgroundColor: theme.cardBorder, width: 40 }]} />
+            ) : (
+              <Text style={[styles.statValue, { color: theme.textPrimary }]}>{goalDaysCount}/{validDays.length || 1}</Text>
+            )}
             <Text style={[styles.statLabel, { color: theme.textMuted }]}>{t.goalDays}</Text>
           </View>
         </Animated.View>
@@ -550,6 +574,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  skeletonBlock: {
+    height: 24,
+    borderRadius: 6,
+    marginVertical: 2,
   },
   sectionTitle: {
     fontSize: 18,

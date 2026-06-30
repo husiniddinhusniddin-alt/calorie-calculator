@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -348,13 +349,14 @@ const analyzeFoodWithAI = async (base64Image: string) => {
                     "4. Reject the image ONLY if you are highly confident it does NOT contain real food, such as drawings, illustrations, paintings, 3D renders, video game screenshots, toys, plastic food, empty scenes, people without visible food, animals, furniture, or non-food objects.\n" +
                     "5. Never hallucinate food that is clearly absent.\n" +
                     "6. If multiple foods are present, identify each separately, estimate for each, and sum them in the total.\n" +
-                    "7. If confidence is low, state that the estimate is approximate (e.g. in the subtitle) rather than refusing to analyze.\n\n" +
+                    "7. If confidence is low, state that the estimate is approximate (e.g. in the subtitle) rather than refusing to analyze.\n" +
+                    "8. IMPORTANT: Estimate the approximate weight (in grams) of the food portion shown in the image. Base ALL your calorie and macronutrient calculations strictly on this estimated weight. Include this total estimated weight clearly in the 'subtitle' field.\n\n" +
                     "Output Format:\n" +
                     "You must return ONLY a JSON object in this format (no markdown formatting):\n" +
                     "If Food Detected is Yes:\n" +
                     "{\n" +
                     "  \"title\": \"Name of the dish(es) found\",\n" +
-                    "  \"subtitle\": \"Portion size / description (indicate if approximate if confidence is low)\",\n" +
+                    "  \"subtitle\": \"Estimated total weight (e.g., '350g') - brief description\",\n" +
                     "  \"serving\": 1,\n" +
                     "  \"calories\": 450,\n" +
                     "  \"macros\": { \"carbs\": 40, \"protein\": 20, \"fat\": 15 },\n" +

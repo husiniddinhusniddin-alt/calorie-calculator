@@ -2,6 +2,7 @@ import { MockStore } from '@/constants/store';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
@@ -23,21 +24,21 @@ const translations = {
     weightMaintenance: 'Weight Maintenance', goalPrefix: 'Goal:', loseWeight: 'Lose weight', gainWeight: 'Gain weight',
     currentStreaks: 'Current Streaks', calorieTarget: 'Calorie Target', waterIntake: 'Water Intake', weightLoss: 'Weight Loss',
     personalDetails: 'Personal Details', notificationSettings: 'Notification Settings', privacySecurity: 'Privacy & Security', appPreferences: 'App Preferences',
-    logOut: 'Log Out', days: 'Days', confirmLogout: 'Log Out', areYouSureLogout: 'Are you sure you want to log out?', cancel: 'Cancel', yes: 'Yes'
+    logOut: 'Log Out', days: 'Days', confirmLogout: 'Log Out', areYouSureLogout: 'Are you sure you want to log out?', cancel: 'Cancel', yes: 'Yes', dayStreak: 'Day streak', avgKcal: 'Avg kcal / day', goalDays: 'Goal days'
   },
   ru: {
     myProfile: 'Мой профиль', weight: 'Вес', height: 'Рост', age: 'Возраст', activeTargetGoal: 'АКТИВНАЯ ЦЕЛЬ', target: 'Цель',
     weightMaintenance: 'Поддержание веса', goalPrefix: 'Цель:', loseWeight: 'Сбросить вес', gainWeight: 'Набрать вес',
     currentStreaks: 'Текущие серии', calorieTarget: 'Цель по калориям', waterIntake: 'Потребление воды', weightLoss: 'Потеря веса',
     personalDetails: 'Личные данные', notificationSettings: 'Настройки уведомлений', privacySecurity: 'Конфиденциальность', appPreferences: 'Настройки',
-    logOut: 'Выйти', days: 'Дней', confirmLogout: 'Выход', areYouSureLogout: 'Вы уверены, что хотите выйти?', cancel: 'Отмена', yes: 'Да'
+    logOut: 'Выйти', days: 'Дней', confirmLogout: 'Выход', areYouSureLogout: 'Вы уверены, что хотите выйти?', cancel: 'Отмена', yes: 'Да', dayStreak: 'Серия дней', avgKcal: 'Среднее ккал/день', goalDays: 'Дни цели'
   },
   uz: {
     myProfile: 'Mening profilim', weight: 'Vazn', height: 'Bo\'yi', age: 'Yosh', activeTargetGoal: 'FAOL MAQSAD', target: 'Maqsad',
     weightMaintenance: 'Vaznni saqlash', goalPrefix: 'Maqsad:', loseWeight: 'yo\'qotish', gainWeight: 'oshirish',
     currentStreaks: 'Hozirgi seriyalar', calorieTarget: 'Kaloriya maqsadi', waterIntake: 'Suv ichish', weightLoss: 'Vazn yo\'qotish',
     personalDetails: 'Shaxsiy ma\'lumotlar', notificationSettings: 'Bildirishnomalar', privacySecurity: 'Maxfiylik', appPreferences: 'Ilova sozlamalari',
-    logOut: 'Chiqish', days: 'Kun', confirmLogout: 'Chiqish', areYouSureLogout: 'Haqiqatan ham tizimdan chiqmoqchimisiz?', cancel: 'Bekor qilish', yes: 'Ha'
+    logOut: 'Chiqish', days: 'Kun', confirmLogout: 'Chiqish', areYouSureLogout: 'Haqiqatan ham tizimdan chiqmoqchimisiz?', cancel: 'Bekor qilish', yes: 'Ha', dayStreak: 'Kunlik seriya', avgKcal: 'O\'rtacha kkal', goalDays: 'Maqsadli kunlar'
   }
 };
 
@@ -80,6 +81,70 @@ export default function ProfileScreen() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [avgKcal, setAvgKcal] = useState(0);
+  const [goalDays, setGoalDays] = useState('0/1');
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadStats = async () => {
+        setIsLoadingStats(true);
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData?.user) return;
+        
+        const last7Days: string[] = [];
+        const today = new Date();
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          last7Days.push(d.toISOString().split('T')[0]);
+        }
+
+        const { data } = await supabase
+          .from('diary_entries')
+          .select('date, calories')
+          .eq('user_id', userData.user.id)
+          .in('date', last7Days)
+          .neq('meal_type', 'steps_history');
+
+        const grouped: Record<string, number> = {};
+        last7Days.forEach(d => grouped[d] = 0);
+
+        if (data) {
+          data.forEach(entry => {
+            if (grouped[entry.date] !== undefined) {
+              grouped[entry.date] += (entry.calories || 0);
+            }
+          });
+        }
+
+        const dailyGoal = MockStore.dailyCalorieGoal || 1900;
+        const validDays = last7Days.map(d => grouped[d]).filter(cal => cal > 0);
+        
+        const avg = validDays.length ? Math.round(validDays.reduce((sum, c) => sum + c, 0) / validDays.length) : 0;
+        const goalCount = validDays.filter(c => c <= dailyGoal).length;
+        
+        let streak = 0;
+        for (let i = 0; i < last7Days.length; i++) {
+          const cals = grouped[last7Days[i]];
+          if (cals > 0 && cals <= dailyGoal) {
+            streak++;
+          } else if (i !== 0 || grouped[last7Days[0]] > 0) {
+            break;
+          }
+        }
+
+        setAvgKcal(avg);
+        setGoalDays(`${goalCount}/${validDays.length || 1}`);
+        setCurrentStreak(streak);
+        setIsLoadingStats(false);
+      };
+
+      loadStats();
+    }, [])
+  );
 
   // Subscribe to MockStore updates
   useEffect(() => {
@@ -250,64 +315,37 @@ export default function ProfileScreen() {
           </View>
         </Animated.View>
 
-        {/* Goal Summary Card */}
-        <Animated.View
-          entering={FadeInDown.duration(500).delay(150)}
-          style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-        >
-          <TouchableOpacity
-            style={styles.goalCardContent}
-            onPress={() => router.push('/(tabs)/goal')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.goalIconContainer, { backgroundColor: theme.badgeBackground }]}>
-              <Ionicons name="flag" size={22} color="#7EB93C" />
-            </View>
-            <View style={styles.goalInfo}>
-              <Text style={[styles.goalHeaderTitle, { color: theme.textMuted }]}>{t.activeTargetGoal}</Text>
-              <Text style={[styles.goalWeightInfo, { color: theme.textPrimary }]}>
-                {t.target}: {targetWeight} kg
-              </Text>
-              <Text style={styles.goalDifferenceText}>
-                {absWeightDiff === 0
-                  ? t.weightMaintenance
-                  : `${t.goalPrefix} ${absWeightDiff.toFixed(1)} kg ${isLoss ? t.loseWeight : t.gainWeight}`
-                }
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#7EB93C" />
-          </TouchableOpacity>
-        </Animated.View>
 
-        <Animated.View
-          entering={FadeInDown.duration(500).delay(200)}
-          style={[styles.achievementsCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}
-        >
-          <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.currentStreaks}</Text>
-          <View style={styles.streaksContainer}>
-            <View style={[styles.streakItem, { backgroundColor: theme.streakBoxBg, borderColor: theme.cardBorder }]}>
-              <View style={[styles.streakIconBg, { backgroundColor: '#FFF7E6' }]}>
-                <Ionicons name="flame" size={24} color="#FFA940" />
-              </View>
-              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>{calorieStreak} {t.days}</Text>
-              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.calorieTarget}</Text>
-            </View>
 
-            <View style={[styles.streakItem, { backgroundColor: theme.streakBoxBg, borderColor: theme.cardBorder }]}>
-              <View style={[styles.streakIconBg, { backgroundColor: '#F0FAE4' }]}>
-                <Ionicons name="water" size={24} color="#7EB93C" />
-              </View>
-              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>{waterStreak} {t.days}</Text>
-              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.waterIntake}</Text>
-            </View>
 
-            <View style={[styles.streakItem, { backgroundColor: theme.streakBoxBg, borderColor: theme.cardBorder }]}>
-              <View style={[styles.streakIconBg, { backgroundColor: '#E6F7FF' }]}>
-                <Ionicons name="trending-down" size={24} color="#1890FF" />
-              </View>
-              <Text style={[styles.streakCount, { color: theme.textPrimary }]}>{isLoss ? '-' : '+'}{absWeightDiff.toFixed(1)} kg</Text>
-              <Text style={[styles.streakLabel, { color: theme.textMuted }]}>{t.weightLoss}</Text>
-            </View>
+        {/* Weekly Stats */}
+        <Animated.View entering={FadeInDown.duration(500).delay(200)} style={styles.statsRowProfile}>
+          <View style={[styles.statCardProfile, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <Ionicons name="flame" size={22} color={isLoadingStats ? theme.cardBorder : "#FF8C42"} />
+            {isLoadingStats ? (
+              <View style={[styles.skeletonBlock, { backgroundColor: theme.cardBorder, width: 30 }]} />
+            ) : (
+              <Text style={[styles.statValueProfile, { color: theme.textPrimary }]}>{currentStreak}</Text>
+            )}
+            <Text style={[styles.statLabelProfile, { color: theme.textMuted }]}>{t.dayStreak}</Text>
+          </View>
+          <View style={[styles.statCardProfile, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <Ionicons name="bar-chart" size={22} color={isLoadingStats ? theme.cardBorder : "#7EB93C"} />
+            {isLoadingStats ? (
+              <View style={[styles.skeletonBlock, { backgroundColor: theme.cardBorder, width: 50 }]} />
+            ) : (
+              <Text style={[styles.statValueProfile, { color: theme.textPrimary }]}>{avgKcal}</Text>
+            )}
+            <Text style={[styles.statLabelProfile, { color: theme.textMuted }]}>{t.avgKcal}</Text>
+          </View>
+          <View style={[styles.statCardProfile, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <Ionicons name="trophy" size={22} color={isLoadingStats ? theme.cardBorder : "#F4C344"} />
+            {isLoadingStats ? (
+              <View style={[styles.skeletonBlock, { backgroundColor: theme.cardBorder, width: 40 }]} />
+            ) : (
+              <Text style={[styles.statValueProfile, { color: theme.textPrimary }]}>{goalDays}</Text>
+            )}
+            <Text style={[styles.statLabelProfile, { color: theme.textMuted }]}>{t.goalDays}</Text>
           </View>
         </Animated.View>
 
@@ -579,6 +617,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+  },
+  statsRowProfile: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  statCardProfile: {
+    flex: 1,
+    borderRadius: 24,
+    paddingVertical: 16,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1.5,
+  },
+  statValueProfile: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  statLabelProfile: {
+    fontSize: 11,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  skeletonBlock: {
+    height: 24,
+    borderRadius: 6,
+    marginVertical: 2,
   },
   streakItem: {
     flex: 1,
