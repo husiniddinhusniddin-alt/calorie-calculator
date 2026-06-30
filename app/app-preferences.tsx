@@ -5,6 +5,7 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,8 +38,10 @@ export default function AppPreferencesScreen() {
   };
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
+    setIsSaving(true);
     MockStore.update({ appTheme, language });
     
     try {
@@ -55,6 +58,7 @@ export default function AppPreferencesScreen() {
 
     setSnackbarVisible(true);
     setTimeout(() => {
+      setIsSaving(false);
       router.back();
     }, 1500);
   };
@@ -198,11 +202,16 @@ export default function AppPreferencesScreen() {
           </View>
 
           <TouchableOpacity 
-            style={styles.saveBtn}
+            style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
             onPress={handleSave}
             activeOpacity={0.85}
+            disabled={isSaving}
           >
-            <Text style={styles.saveBtnText}>Save Preferences</Text>
+            {isSaving ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Preferences</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
 

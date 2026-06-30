@@ -62,15 +62,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="goal"
-        options={{
-          title: t.goal,
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons size={24} name={focused ? 'flag' : 'flag-outline'} color={color} />
-          ),
-        }}
-      />
+
       <Tabs.Screen
         name="history"
         options={{
