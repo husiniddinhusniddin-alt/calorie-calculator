@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/constants/supabase';
 import { MockStore } from '@/constants/store';
+import { OfflineModal } from '@/components/OfflineModal';
 
 export const unstable_settings = {
   initialRouteName: '(auth)',
@@ -200,6 +201,7 @@ function RootLayoutNav() {
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style="auto" />
+        <OfflineModal />
       </View>
     </ThemeProvider>
   );
