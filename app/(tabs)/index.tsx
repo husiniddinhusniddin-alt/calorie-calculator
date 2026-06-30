@@ -764,9 +764,12 @@ export default function DiaryScreen() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* Header Top Row - Fixed */}
-      <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={[styles.header, { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: Math.max(10, insets.top) + 4 }]}>
-        <Animated.View entering={FadeInDown.duration(500)}>
+      <ScrollView 
+        contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 20) + 8 }]} 
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Top Row - Now scrolls with the content */}
+        <Animated.View entering={FadeInDown.duration(500)} style={{ marginBottom: 8 }}>
           <View style={styles.headerTopRow}>
             <TouchableOpacity 
               style={[styles.datePill, { backgroundColor: theme.pillBackground }]}
@@ -796,9 +799,6 @@ export default function DiaryScreen() {
             </TouchableOpacity>
           </View>
         </Animated.View>
-      </BlurView>
-
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: Math.max(10, insets.top) + 60 }]} showsVerticalScrollIndicator={false}>
         {isFetching ? (
           <View style={{ marginTop: 0 }}>
             {/* Target Card Skeleton */}

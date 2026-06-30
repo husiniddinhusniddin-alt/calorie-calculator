@@ -366,16 +366,10 @@ export default function HistoryScreen() {
         {/* Day-by-Day Log */}
         <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.dailyLog}</Text>
 
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <Animated.View key={`skel-${i}`} entering={FadeInDown.duration(500).delay(220 + i * 70)}>
-              <View style={[styles.dayCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, height: 90, justifyContent: 'center' }]}>
-                 <View style={[styles.skeletonBlock, { backgroundColor: theme.cardBorder, width: '35%', height: 18, marginBottom: 8 }]} />
-                 <View style={[styles.skeletonBlock, { backgroundColor: theme.cardBorder, width: '25%', height: 26 }]} />
-              </View>
-            </Animated.View>
-          ))
-        ) : historyData.map((day, i) => {
+        {historyData.map((day, i) => {
+          // Hide past days if no calories logged
+          if (!day.isToday && day.totalCalories === 0) return null;
+
           const isExpanded = expandedIndex === i;
           const pct = day.goalCalories > 0 ? Math.min((day.totalCalories / day.goalCalories) * 100, 100) : 0;
           const isOver = day.totalCalories > day.goalCalories;
