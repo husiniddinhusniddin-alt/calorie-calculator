@@ -343,6 +343,9 @@ export default function HistoryScreen() {
         <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.dailyLog}</Text>
 
         {historyData.map((day, i) => {
+          // Hide past days if no calories logged
+          if (!day.isToday && day.totalCalories === 0) return null;
+
           const isExpanded = expandedIndex === i;
           const pct = day.goalCalories > 0 ? Math.min((day.totalCalories / day.goalCalories) * 100, 100) : 0;
           const isOver = day.totalCalories > day.goalCalories;
