@@ -9,6 +9,7 @@ import {
   Platform,
   Image,
   useColorScheme,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,6 +52,7 @@ export default function ProfileDetailsScreen() {
 
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   // On mount, fetch full profile from Supabase to get phone, height, dob
   useEffect(() => {
@@ -88,6 +90,8 @@ export default function ProfileDetailsScreen() {
       return;
     }
 
+    setIsSaving(true);
+
     const parsedWeight = parseFloat(weight) || MockStore.currentWeight;
     const parsedHeight = parseFloat(height) || 180;
     const parsedAge = parseInt(age, 10) || null;
@@ -121,6 +125,7 @@ export default function ProfileDetailsScreen() {
           console.warn('Update error:', error);
           setSnackbarMsg('Failed to update: ' + error.message);
           setSnackbarVisible(true);
+          setIsSaving(false);
           return;
         }
       }
@@ -131,6 +136,7 @@ export default function ProfileDetailsScreen() {
     setSnackbarMsg('Personal details saved successfully! 🎉');
     setSnackbarVisible(true);
     setTimeout(() => {
+      setIsSaving(false);
       router.back();
     }, 1500);
   };
@@ -308,11 +314,16 @@ export default function ProfileDetailsScreen() {
             </View>
 
             <TouchableOpacity 
-              style={styles.saveBtn}
+              style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
               onPress={handleSave}
               activeOpacity={0.85}
+              disabled={isSaving}
             >
-              <Text style={styles.saveBtnText}>Save Changes</Text>
+              {isSaving ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save Changes</Text>
+              )}
             </TouchableOpacity>
 
           </ScrollView>
