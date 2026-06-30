@@ -18,9 +18,9 @@ import { supabase } from '@/constants/supabase';
 
 export default function AppPreferencesScreen() {
   const router = useRouter();
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
-  const [heightUnit, setHeightUnit] = useState<'cm' | 'inches'>('cm');
-  const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal');
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>(MockStore.weightUnit || 'kg');
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'inches'>(MockStore.heightUnit || 'cm');
+  const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>(MockStore.energyUnit || 'kcal');
   const [appTheme, setAppTheme] = useState<'light' | 'dark' | 'system'>(MockStore.appTheme);
   const [language, setLanguage] = useState<'en' | 'ru' | 'uz'>(MockStore.language);
 
@@ -42,7 +42,7 @@ export default function AppPreferencesScreen() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    MockStore.update({ appTheme, language });
+    MockStore.update({ appTheme, language, weightUnit, heightUnit, energyUnit });
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -59,9 +59,16 @@ export default function AppPreferencesScreen() {
     setSnackbarVisible(true);
     setTimeout(() => {
       setIsSaving(false);
-      router.back();
+      (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'));
     }, 1500);
   };
+
+  const hasChanges = 
+    weightUnit !== MockStore.weightUnit ||
+    heightUnit !== MockStore.heightUnit ||
+    energyUnit !== MockStore.energyUnit ||
+    appTheme !== MockStore.appTheme ||
+    language !== MockStore.language;
 
   return (
     <PaperProvider>
@@ -71,7 +78,7 @@ export default function AppPreferencesScreen() {
         <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.cardBorder }]}>
           <TouchableOpacity 
             style={[styles.backBtn, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}
-            onPress={() => router.back()}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))}
             activeOpacity={0.7}
           >
             <Ionicons name="arrow-back" size={24} color={theme.textSecondary} />
@@ -201,18 +208,20 @@ export default function AppPreferencesScreen() {
             </View>
           </View>
 
-          <TouchableOpacity 
-            style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
-            onPress={handleSave}
-            activeOpacity={0.85}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.saveBtnText}>Save Preferences</Text>
-            )}
-          </TouchableOpacity>
+          {hasChanges && (
+            <TouchableOpacity 
+              style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
+              onPress={handleSave}
+              activeOpacity={0.85}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save Preferences</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         <Portal>
