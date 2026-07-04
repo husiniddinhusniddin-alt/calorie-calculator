@@ -10,33 +10,103 @@ import {
   Platform,
   ScrollView,
   Dimensions,
-  Pressable,
-  Alert,
   ActivityIndicator,
   Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/constants/supabase';
 import { MockStore } from '@/constants/store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height, width } = Dimensions.get('window');
 
+const translations = {
+  en: {
+    welcome: 'Welcome back!',
+    emailLabel: 'Email',
+    passwordLabel: 'Password',
+    forgotPassword: 'Forgot your password?',
+    loginButton: 'Log In',
+    noAccount: "Don't have an account? ",
+    createOne: 'Create one',
+    emailReq: 'Please enter your email!',
+    emailInvalid: 'Please enter a valid email address!',
+    passwordReq: 'Please enter your password!',
+    accountDeletedTitle: 'Account deleted',
+    accountDeletedMsg: 'This account has been permanently deleted. Please create a new account or use a different email.',
+    errorTitle: 'Error',
+    errorInvalidLogin: 'Incorrect email or password. If you deleted your account, it might be permanently closed.',
+    errorUnexpected: 'An unexpected error occurred',
+    understandBtn: 'Understood'
+  },
+  ru: {
+    welcome: 'С возвращением!',
+    emailLabel: 'Email',
+    passwordLabel: 'Пароль',
+    forgotPassword: 'Забыли пароль?',
+    loginButton: 'Войти',
+    noAccount: "Нет аккаунта? ",
+    createOne: 'Создать',
+    emailReq: 'Пожалуйста, введите ваш email!',
+    emailInvalid: 'Пожалуйста, введите правильный email!',
+    passwordReq: 'Пожалуйста, введите пароль!',
+    accountDeletedTitle: 'Аккаунт удален',
+    accountDeletedMsg: 'Этот аккаунт был навсегда удален. Пожалуйста, создайте новый аккаунт или используйте другой email.',
+    errorTitle: 'Ошибка',
+    errorInvalidLogin: 'Неверный email или пароль. Если вы удалили свой аккаунт, возможно, он закрыт навсегда.',
+    errorUnexpected: 'Произошла непредвиденная ошибка',
+    understandBtn: 'Понятно'
+  },
+  uz: {
+    welcome: 'Xush kelibsiz!',
+    emailLabel: 'Email',
+    passwordLabel: 'Parol',
+    forgotPassword: 'Parolni unutdingizmi?',
+    loginButton: 'Kirish',
+    noAccount: "Akkauntingiz yo'qmi? ",
+    createOne: 'Yaratish',
+    emailReq: 'Iltimos, email manzilingizni kiriting!',
+    emailInvalid: 'Iltimos, to\'g\'ri email manzili kiriting!',
+    passwordReq: 'Iltimos, parolingizni kiriting!',
+    accountDeletedTitle: 'Akkaunt o\'chirilgan',
+    accountDeletedMsg: 'Bu akkaunt butunlay o\'chirilgan. Iltimos, yangi akkaunt yarating yoki boshqa pochtadan foydalaning.',
+    errorTitle: 'Xatolik',
+    errorInvalidLogin: 'Email yoki parol xato kiritildi. Agar akkauntingizni o\'chirgan bo\'lsangiz, u butunlay yopilgan bo\'lishi mumkin.',
+    errorUnexpected: 'Kutilmagan xatolik yuz berdi',
+    understandBtn: 'Tushunarli'
+  }
+};
+
 export default function LoginScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [language, setLanguage] = useState<'en' | 'ru' | 'uz'>(MockStore.language as 'en' | 'ru' | 'uz');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [langModalVisible, setLangModalVisible] = useState(false);
+  const [languageChanged, setLanguageChanged] = useState(false);
 
   const [customModalVisible, setCustomModalVisible] = useState(false);
   const [customModalTitle, setCustomModalTitle] = useState('');
   const [customModalMessage, setCustomModalMessage] = useState('');
+
+  const t = translations[language];
+
+  const changeLanguage = (lang: 'en' | 'ru' | 'uz') => {
+    setLanguage(lang);
+    setLanguageChanged(true);
+    MockStore.update({ language: lang });
+    setEmailError('');
+    setPasswordError('');
+  };
 
   const handleLogin = async () => {
     if (loading) return;
@@ -45,17 +115,17 @@ export default function LoginScreen() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!email.trim()) {
-      setEmailError('Iltimos, email manzilingizni kiriting!');
+      setEmailError(t.emailReq);
       isValid = false;
     } else if (!emailRegex.test(email.trim())) {
-      setEmailError('Iltimos, to\'g\'ri email manzili kiriting!');
+      setEmailError(t.emailInvalid);
       isValid = false;
     } else {
       setEmailError('');
     }
 
     if (!password.trim()) {
-      setPasswordError('Iltimos, parolingizni kiriting!');
+      setPasswordError(t.passwordReq);
       isValid = false;
     } else {
       setPasswordError('');
@@ -67,8 +137,8 @@ export default function LoginScreen() {
         const deletedStr = await AsyncStorage.getItem('deleted_accounts');
         const deletedList = deletedStr ? JSON.parse(deletedStr) : [];
         if (deletedList.includes(email.trim().toLowerCase())) {
-          setCustomModalTitle('Akkaunt o\'chirilgan');
-          setCustomModalMessage('Bu akkaunt butunlay o\'chirilgan. Iltimos, yangi akkaunt yarating yoki boshqa pochtadan foydalaning.');
+          setCustomModalTitle(t.accountDeletedTitle);
+          setCustomModalMessage(t.accountDeletedMsg);
           setCustomModalVisible(true);
           setLoading(false);
           return;
@@ -82,9 +152,9 @@ export default function LoginScreen() {
         if (error) {
           let errorMsg = error.message;
           if (errorMsg === 'Invalid login credentials') {
-            errorMsg = 'Email yoki parol xato kiritildi. Agar akkauntingizni o\'chirgan bo\'lsangiz, u butunlay yopilgan bo\'lishi mumkin.';
+            errorMsg = t.errorInvalidLogin;
           }
-          setCustomModalTitle('Xatolik');
+          setCustomModalTitle(t.errorTitle);
           setCustomModalMessage(errorMsg);
           setCustomModalVisible(true);
           setLoading(false);
@@ -104,6 +174,14 @@ export default function LoginScreen() {
           }
 
           if (profile) {
+            let finalLang = profile.language ?? 'en';
+            
+            // Only update Supabase if the user EXPLICITLY changed the language on the login screen
+            if (languageChanged && profile.language !== language) {
+              finalLang = language;
+              await supabase.from('profiles').update({ language: finalLang }).eq('id', data.user.id);
+            }
+
             // Update MockStore with user's settings from Supabase
             MockStore.update({
               name: profile.name || data.user.email?.split('@')[0] || 'User',
@@ -120,11 +198,12 @@ export default function LoginScreen() {
               calorieStreak: profile.calorie_streak ?? 0,
               waterStreak: profile.water_streak ?? 0,
               appTheme: profile.app_theme ?? 'system',
-              language: profile.language ?? 'en',
+              language: finalLang, // Use the determined language
               notifications: profile.notifications ?? MockStore.notifications,
             });
           } else {
             // Profile missing (e.g. from email confirmation), create it now
+            const currentLang = language;
             const meta = data.user.user_metadata || {};
             const newProfile = {
               id: data.user.id,
@@ -142,7 +221,7 @@ export default function LoginScreen() {
               calorie_streak: 0,
               water_streak: 0,
               app_theme: 'system',
-              language: 'en',
+              language: currentLang, // Use the selected language
               notifications: MockStore.notifications,
             };
             
@@ -162,7 +241,7 @@ export default function LoginScreen() {
               calorieStreak: newProfile.calorie_streak,
               waterStreak: newProfile.water_streak,
               appTheme: newProfile.app_theme as 'light' | 'dark' | 'system',
-              language: newProfile.language as 'en' | 'ru' | 'uz',
+              language: currentLang as 'en' | 'ru' | 'uz',
               notifications: newProfile.notifications,
             });
           }
@@ -170,8 +249,8 @@ export default function LoginScreen() {
           router.replace('/(tabs)');
         }
       } catch (err: any) {
-        setCustomModalTitle('Xatolik');
-        setCustomModalMessage(err.message || 'Kutilmagan xatolik yuz berdi');
+        setCustomModalTitle(t.errorTitle);
+        setCustomModalMessage(err.message || t.errorUnexpected);
         setCustomModalVisible(true);
       } finally {
         setLoading(false);
@@ -197,6 +276,17 @@ export default function LoginScreen() {
             <View style={[styles.patternDot, { top: 60, right: 40, width: 12, height: 12 }]} />
             <View style={[styles.patternLeaf, { top: 100, left: 30 }]} />
             <View style={[styles.patternLeaf, { top: 40, right: 80, transform: [{ rotate: '45deg' }] }]} />
+            
+            {/* Language Selector Button */}
+            <View style={[styles.languageSelector, { paddingTop: insets.top + 10 }]}>
+              <TouchableOpacity onPress={() => setLangModalVisible(true)} style={styles.currentLangBtn}>
+                <Ionicons name="globe-outline" size={18} color="#7EB93C" />
+                <Text style={styles.currentLangText}>
+                  {language === 'uz' ? "O'zbekcha" : language === 'ru' ? "Русский" : "English"}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#7EB93C" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Main login card */}
@@ -217,11 +307,11 @@ export default function LoginScreen() {
 
             {/* Form Content */}
             <View style={styles.formContainer}>
-              <Text style={styles.title}>Welcome back!</Text>
+              <Text style={styles.title}>{t.welcome}</Text>
 
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Email</Text>
+                <Text style={styles.inputLabel}>{t.emailLabel}</Text>
                 <View style={[styles.inputWrapper, emailError ? styles.inputWrapperError : null]}>
                   <Ionicons name="mail-outline" size={20} color={emailError ? '#FF3B30' : '#8CC33F'} style={styles.inputIcon} />
                   <TextInput
@@ -242,7 +332,7 @@ export default function LoginScreen() {
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Password</Text>
+                <Text style={styles.inputLabel}>{t.passwordLabel}</Text>
                 <View style={[styles.inputWrapper, passwordError ? styles.inputWrapperError : null]}>
                   <Ionicons name="lock-closed-outline" size={20} color={passwordError ? '#FF3B30' : '#8CC33F'} style={styles.inputIcon} />
                   <TextInput
@@ -273,7 +363,7 @@ export default function LoginScreen() {
 
               {/* Forgot Password */}
               <TouchableOpacity style={styles.forgotPasswordContainer}>
-                <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
+                <Text style={styles.forgotPasswordText}>{t.forgotPassword}</Text>
               </TouchableOpacity>
 
               {/* Login Button */}
@@ -286,20 +376,61 @@ export default function LoginScreen() {
                 {loading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.loginButtonText}>Log In</Text>
+                  <Text style={styles.loginButtonText}>{t.loginButton}</Text>
                 )}
               </TouchableOpacity>
 
               <View style={styles.footerContainer}>
-                <Text style={styles.footerText}>{"Don't have an account? "}</Text>
+                <Text style={styles.footerText}>{t.noAccount}</Text>
                 <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-                  <Text style={styles.footerLink}>Create one</Text>
+                  <Text style={styles.footerLink}>{t.createOne}</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Language Selection Modal */}
+      <Modal
+        visible={langModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setLangModalVisible(false)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setLangModalVisible(false)}>
+          <View style={styles.langModalContainer}>
+            <Text style={styles.langModalTitle}>Tilni tanlang / Выберите язык</Text>
+            
+            <TouchableOpacity 
+              style={[styles.langOptionBtn, language === 'uz' && styles.langOptionBtnActive]} 
+              onPress={() => { changeLanguage('uz'); setLangModalVisible(false); }}
+            >
+              <Text style={styles.langOptionFlag}>🇺🇿</Text>
+              <Text style={[styles.langOptionText, language === 'uz' && styles.langOptionTextActive]}>O&apos;zbekcha</Text>
+              {language === 'uz' && <Ionicons name="checkmark-circle" size={24} color="#7EB93C" />}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.langOptionBtn, language === 'ru' && styles.langOptionBtnActive]} 
+              onPress={() => { changeLanguage('ru'); setLangModalVisible(false); }}
+            >
+              <Text style={styles.langOptionFlag}>🇷🇺</Text>
+              <Text style={[styles.langOptionText, language === 'ru' && styles.langOptionTextActive]}>Русский</Text>
+              {language === 'ru' && <Ionicons name="checkmark-circle" size={24} color="#7EB93C" />}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.langOptionBtn, language === 'en' && styles.langOptionBtnActive]} 
+              onPress={() => { changeLanguage('en'); setLangModalVisible(false); }}
+            >
+              <Text style={styles.langOptionFlag}>🇺🇸</Text>
+              <Text style={[styles.langOptionText, language === 'en' && styles.langOptionTextActive]}>English</Text>
+              {language === 'en' && <Ionicons name="checkmark-circle" size={24} color="#7EB93C" />}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Custom Alert Modal */}
       <Modal
@@ -545,4 +676,76 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  languageSelector: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  currentLangBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  currentLangText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3A5C18',
+  },
+  langModalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  langModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#3A5C18',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  langOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: '#F5FAF0',
+    marginBottom: 10,
+  },
+  langOptionBtnActive: {
+    backgroundColor: '#E8F5D8',
+    borderWidth: 1,
+    borderColor: '#7EB93C',
+  },
+  langOptionFlag: {
+    fontSize: 22,
+    marginRight: 14,
+  },
+  langOptionText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333333',
+    fontWeight: '500',
+  },
+  langOptionTextActive: {
+    color: '#3A5C18',
+    fontWeight: '700',
+  }
 });

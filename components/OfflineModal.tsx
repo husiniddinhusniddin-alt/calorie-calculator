@@ -1,18 +1,44 @@
+// cSpell:disable
+/* eslint-disable */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Dimensions, TouchableOpacity, ActivityIndicator } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { MockStore } from '@/constants/store';
 
 const { width, height } = Dimensions.get('window');
+
+type LanguageCode = 'en' | 'ru' | 'uz';
+
+const translations: Record<LanguageCode, { noInternet: string, checkConnection: string, retry: string }> = {
+  en: {
+    noInternet: 'No Internet Connection',
+    checkConnection: 'Please check your internet connection and try again. A network connection is required to use the app.',
+    retry: 'Retry'
+  },
+  ru: {
+    noInternet: 'Нет подключения к Интернету',
+    checkConnection: 'Пожалуйста, проверьте подключение к Интернету и повторите попытку. Для работы приложения требуется сеть.',
+    retry: 'Повторить'
+  },
+  uz: {
+    noInternet: 'Internet aloqasi yo\'q',
+    checkConnection: 'Iltimos, internet ulanishingizni tekshiring va qaytadan urinib ko\'ring. Dastur ishlashi uchun tarmoq zarur.',
+    retry: 'Qayta urinish'
+  }
+};
 
 export const OfflineModal = () => {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
   const [isChecking, setIsChecking] = useState(false);
+  const [language, setLanguage] = useState<LanguageCode>(MockStore.language as LanguageCode);
   const slideAnim = React.useRef(new Animated.Value(height)).current; // Start from bottom
   const opacityAnim = React.useRef(new Animated.Value(0)).current;
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+
+  const t = translations[language] || translations.en;
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -22,7 +48,14 @@ export const OfflineModal = () => {
       }
     });
 
-    return () => unsubscribe();
+    const unsubscribeStore = MockStore.subscribe(() => {
+      setLanguage(MockStore.language as LanguageCode);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeStore();
+    };
   }, []);
 
   useEffect(() => {
@@ -57,7 +90,7 @@ export const OfflineModal = () => {
         })
       ]).start();
     }
-  }, [isConnected]);
+  }, [isConnected, slideAnim, opacityAnim]);
 
   if (isConnected === null || isConnected === true) {
     // Return early if connected but keep the animation values ready
@@ -95,10 +128,10 @@ export const OfflineModal = () => {
           <Ionicons name="cloud-offline" size={60} color="#7EB93C" />
         </View>
         <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#1A1A1A' }]}>
-          Internet aloqasi yo'q
+          {t.noInternet}
         </Text>
         <Text style={[styles.message, { color: isDark ? '#A0A0A0' : '#666666' }]}>
-          Iltimos, internet ulanishingizni tekshiring va qaytadan urinib ko'ring. Dastur ishlashi uchun tarmoq zarur.
+          {t.checkConnection}
         </Text>
         
         <TouchableOpacity 
@@ -109,7 +142,7 @@ export const OfflineModal = () => {
           {isChecking ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.retryButtonText}>Qayta urinish</Text>
+            <Text style={styles.retryButtonText}>{t.retry}</Text>
           )}
         </TouchableOpacity>
       </Animated.View>

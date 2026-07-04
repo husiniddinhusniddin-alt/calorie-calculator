@@ -33,7 +33,8 @@ const translations = {
     other: 'Other',
     sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat',
     todayLabel: 'Today, ',
-    yesterdayLabel: 'Yesterday, '
+    yesterdayLabel: 'Yesterday, ',
+    noMeals: 'No meals logged.'
   },
   ru: {
     historyTitle: 'История',
@@ -52,7 +53,8 @@ const translations = {
     other: 'Другое',
     sun: 'Вс', mon: 'Пн', tue: 'Вт', wed: 'Ср', thu: 'Чт', fri: 'Пт', sat: 'Сб',
     todayLabel: 'Сегодня, ',
-    yesterdayLabel: 'Вчера, '
+    yesterdayLabel: 'Вчера, ',
+    noMeals: 'Нет записей.'
   },
   uz: {
     historyTitle: 'Tarix',
@@ -71,7 +73,8 @@ const translations = {
     other: 'Boshqa',
     sun: 'Yak', mon: 'Dush', tue: 'Sesh', wed: 'Chor', thu: 'Pay', fri: 'Jum', sat: 'Shan',
     todayLabel: 'Bugun, ',
-    yesterdayLabel: 'Kecha, '
+    yesterdayLabel: 'Kecha, ',
+    noMeals: 'Ovqatlar qayd etilmagan.'
   }
 };
 
@@ -450,7 +453,7 @@ export default function HistoryScreen() {
                 )}
                 {isExpanded && day.meals.length === 0 && (
                   <View style={styles.mealList}>
-                    <Text style={{color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: 10}}>No meals logged.</Text>
+                    <Text style={{color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: 10}}>{t.noMeals}</Text>
                   </View>
                 )}
               </TouchableOpacity>

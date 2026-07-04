@@ -25,6 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LocaleConfig } from 'react-native-calendars';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -47,6 +48,8 @@ const translations = {
     bpm: 'bpm',
     km: 'Km',
     kcal: 'kcal',
+    startWalking: 'Start walking to see your route',
+    noRoute: 'No route data available',
   },
   ru: {
     dailyActivity: 'Активность',
@@ -65,6 +68,8 @@ const translations = {
     bpm: 'уд/м',
     km: 'Км',
     kcal: 'ккал',
+    startWalking: 'Начните идти, чтобы увидеть маршрут',
+    noRoute: 'Нет данных о маршруте',
   },
   uz: {
     dailyActivity: 'Faollik',
@@ -83,18 +88,21 @@ const translations = {
     bpm: 'ur/m',
     km: 'Km',
     kcal: 'kkal',
+    startWalking: 'Marshrutni ko\'rish uchun yuring',
+    noRoute: 'Marshrut ma\'lumotlari yo\'q',
   },
 };
 
 // ─── Week Days ────────────────────────────────────────────────────────────────
-const getWeekDays = () => {
+const getWeekDays = (language: string) => {
+  const locData = LocaleConfig.locales[language] || LocaleConfig.locales['en'];
   const today = new Date();
   const days = [];
   for (let i = -2; i <= 2; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     days.push({
-      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      day: locData.dayNamesShort[d.getDay()],
       date: d.getDate(),
       isToday: i === 0,
     });
@@ -189,7 +197,7 @@ const WalkingFigure = ({ color }: { color: string }) => {
 // ─── Route Map ────────────────────────────────────────────────────────────────
 type LatLng = { latitude: number; longitude: number };
 
-const RouteMap = ({ isDark, routePoints, onPress }: { isDark: boolean; routePoints: LatLng[], onPress?: () => void }) => {
+const RouteMap = ({ isDark, routePoints, onPress, t }: { isDark: boolean; routePoints: LatLng[], onPress?: () => void, t: any }) => {
   const routeColor = '#7EB93C';
   const bgColor = isDark ? '#1A2310' : '#F5F9F0';
   const textColor = isDark ? '#8a9e7a' : '#5a7a3a';
@@ -199,7 +207,7 @@ const RouteMap = ({ isDark, routePoints, onPress }: { isDark: boolean; routePoin
       <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.mapContainer, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
         <WalkingFigure color={routeColor} />
         <Text style={{ color: textColor, marginTop: 14, fontSize: 13 }}>
-          Start walking to see your route
+          {t.startWalking}
         </Text>
       </TouchableOpacity>
     );
@@ -565,6 +573,11 @@ export default function PedometerScreen() {
   const systemColorScheme = useColorScheme();
   const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
   const t = translations[language as keyof typeof translations] || translations.en;
+  const [weekDays, setWeekDays] = useState(() => getWeekDays(language));
+
+  useEffect(() => {
+    setWeekDays(getWeekDays(language));
+  }, [language]);
 
   const theme = {
     background: isDark ? '#0F140A' : '#F7FAF3',
@@ -576,7 +589,6 @@ export default function PedometerScreen() {
     pillBackground: isDark ? '#23321A' : '#F5FAF0',
   };
 
-  const weekDays = getWeekDays();
   const modes = [t.day, t.week, t.month];
 
   // Helper to sum steps over a period
@@ -633,7 +645,10 @@ export default function PedometerScreen() {
           <View style={styles.headerRow}>
             <View>
               <Text style={[styles.headerDate, { color: theme.textMuted }]}>
-                {selectedDateObj.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
+                {(() => {
+                  const locData = LocaleConfig.locales[language] || LocaleConfig.locales['en'];
+                  return `${locData.dayNames[selectedDateObj.getDay()]}, ${selectedDateObj.getDate()} ${locData.monthNamesShort[selectedDateObj.getMonth()]}, ${selectedDateObj.getFullYear()}`;
+                })()}
               </Text>
               <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{t.dailyActivity}</Text>
             </View>
@@ -721,7 +736,7 @@ export default function PedometerScreen() {
           entering={FadeInDown.duration(400).delay(240)}
           style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, overflow: 'hidden', padding: 0 }]}
         >
-          <RouteMap isDark={isDark} routePoints={routePoints} onPress={() => setIsMapFullScreen(true)} />
+          <RouteMap isDark={isDark} routePoints={routePoints} onPress={() => setIsMapFullScreen(true)} t={t} />
         </Animated.View>
 
         {/* ── Stats Grid (2×2) ── */}
@@ -810,7 +825,7 @@ export default function PedometerScreen() {
             </MapView>
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: theme.textMuted }}>No route data available</Text>
+              <Text style={{ color: theme.textMuted }}>{t.noRoute}</Text>
             </View>
           )}
           <View style={{ position: 'absolute', top: Math.max(insets.top + 8, 20), right: 16, zIndex: 10 }}>

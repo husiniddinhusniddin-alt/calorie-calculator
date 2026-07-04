@@ -22,15 +22,99 @@ import { MockStore } from '@/constants/store';
 
 const { height, width } = Dimensions.get('window');
 
-const PURPOSES = [
-  { id: 'lose', label: 'Losing Weight' },
-  { id: 'gain', label: 'Gaining Weight' },
-  { id: 'maintain', label: 'Stay Healthy' },
-];
+const translations = {
+  en: {
+    title: "Tell us about you",
+    age: "Age",
+    heightLabel: "Height (cm)",
+    weightLabel: "Weight (kg)",
+    purpose: "Purpose",
+    purposes: {
+      lose: "Losing Weight",
+      gain: "Gaining Weight",
+      maintain: "Stay Healthy"
+    },
+    calcDiet: "Calculate Diet",
+    aiPlanTitle: "Your AI Diet Plan",
+    howItHelps: "How it helps you",
+    whyBest: "Why it's the best option",
+    acceptStart: "Accept Plan & Start",
+    aiOfferTitle: "AI Diet Plan",
+    aiOfferDesc: "Would you like us to create a highly personalized, AI-generated diet plan based on your unique body metrics and goals?",
+    noThanks: "No, thanks",
+    yesPlease: "Yes, please!",
+    required: "Required",
+    successTitle: "Success",
+    successMsg: "Registration successful! Please confirm your email.",
+    errorTitle: "Error",
+    unexpectedError: "Unexpected error occurred"
+  },
+  ru: {
+    title: "Расскажите о себе",
+    age: "Возраст",
+    heightLabel: "Рост (см)",
+    weightLabel: "Вес (кг)",
+    purpose: "Цель",
+    purposes: {
+      lose: "Похудение",
+      gain: "Набор веса",
+      maintain: "Поддержание здоровья"
+    },
+    calcDiet: "Рассчитать диету",
+    aiPlanTitle: "Ваш план диеты от ИИ",
+    howItHelps: "Как это вам поможет",
+    whyBest: "Почему это лучший вариант",
+    acceptStart: "Принять план и начать",
+    aiOfferTitle: "План диеты от ИИ",
+    aiOfferDesc: "Хотели бы вы, чтобы мы создали персонализированный план диеты с помощью ИИ на основе ваших уникальных метрик и целей?",
+    noThanks: "Нет, спасибо",
+    yesPlease: "Да, конечно!",
+    required: "Обязательно",
+    successTitle: "Успех",
+    successMsg: "Регистрация прошла успешно! Пожалуйста, подтвердите ваш email.",
+    errorTitle: "Ошибка",
+    unexpectedError: "Произошла непредвиденная ошибка"
+  },
+  uz: {
+    title: "O'zingiz haqingizda",
+    age: "Yosh",
+    heightLabel: "Bo'y (sm)",
+    weightLabel: "Vazn (kg)",
+    purpose: "Maqsad",
+    purposes: {
+      lose: "Vazn tashlash",
+      gain: "Vazn yig'ish",
+      maintain: "Sog'lom bo'lish"
+    },
+    calcDiet: "Diyetani hisoblash",
+    aiPlanTitle: "AI Diyeta Rejangiz",
+    howItHelps: "Bu sizga qanday yordam beradi",
+    whyBest: "Nima uchun bu eng yaxshi tanlov",
+    acceptStart: "Rejani qabul qilish va Boshlash",
+    aiOfferTitle: "AI Diyeta Rejasi",
+    aiOfferDesc: "Sizning tana o'lchovlaringiz va maqsadlaringizga moslashtirilgan AI diyeta rejasini yaratishimizni xohlaysizmi?",
+    noThanks: "Yo'q, rahmat",
+    yesPlease: "Ha, albatta!",
+    required: "Majburiy",
+    successTitle: "Muvaffaqiyatli",
+    successMsg: "Ro'yxatdan o'tish muvaffaqiyatli yakunlandi! Iltimos, emailingizni tasdiqlang.",
+    errorTitle: "Xatolik",
+    unexpectedError: "Kutilmagan xatolik yuz berdi"
+  }
+};
 
 export default function RegisterDetailsScreen() {
   const router = useRouter();
   const { email, password, phone } = useLocalSearchParams();
+  const [language] = useState<'en' | 'ru' | 'uz'>(MockStore.language as 'en' | 'ru' | 'uz');
+
+  const t = translations[language];
+
+  const PURPOSES = [
+    { id: 'lose', label: t.purposes.lose },
+    { id: 'gain', label: t.purposes.gain },
+    { id: 'maintain', label: t.purposes.maintain },
+  ];
 
   const [age, setAge] = useState('');
   const [weight, setWeight] = useState('');
@@ -74,7 +158,7 @@ export default function RegisterDetailsScreen() {
       });
 
       if (error) {
-        Alert.alert('Error', error.message);
+        Alert.alert(t.errorTitle, error.message);
         setLoading(false);
         return;
       }
@@ -99,7 +183,7 @@ export default function RegisterDetailsScreen() {
             calorie_streak: 0,
             water_streak: 0,
             app_theme: 'system',
-            language: 'en',
+            language: language,
             notifications: MockStore.notifications,
           });
 
@@ -124,12 +208,12 @@ export default function RegisterDetailsScreen() {
         if (data.session) {
           router.replace('/(tabs)');
         } else {
-          Alert.alert('Success', 'Registration successful! Please confirm your email.');
+          Alert.alert(t.successTitle, t.successMsg);
           router.replace('/(auth)/login');
         }
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Unexpected error occurred');
+      Alert.alert(t.errorTitle, err.message || t.unexpectedError);
     } finally {
       setLoading(false);
     }
@@ -140,9 +224,9 @@ export default function RegisterDetailsScreen() {
     
     let isValid = true;
 
-    if (!age.trim()) { setAgeError('Required'); isValid = false; } else { setAgeError(''); }
-    if (!weight.trim()) { setWeightError('Required'); isValid = false; } else { setWeightError(''); }
-    if (!heightVal.trim()) { setHeightError('Required'); isValid = false; } else { setHeightError(''); }
+    if (!age.trim()) { setAgeError(t.required); isValid = false; } else { setAgeError(''); }
+    if (!weight.trim()) { setWeightError(t.required); isValid = false; } else { setWeightError(''); }
+    if (!heightVal.trim()) { setHeightError(t.required); isValid = false; } else { setHeightError(''); }
 
     if (!isValid) return;
 
@@ -162,14 +246,18 @@ export default function RegisterDetailsScreen() {
         throw new Error('OpenAI API Key not found');
       }
 
+      const langName = language === 'ru' ? 'Russian' : language === 'uz' ? 'Uzbek' : 'English';
       const prompt = `I am a ${age} years old person, my weight is ${weight} kg and my height is ${heightVal} cm. My goal is ${purpose === 'lose' ? 'losing weight' : purpose === 'gain' ? 'gaining weight' : 'maintaining health'}. Please calculate my recommended daily calorie intake. Also calculate my BMI and current BMI status (e.g., Overweight, Normal). Explain how this diet will help me and why it is the best option.
+      
+      CRITICAL: You MUST write the 'status', 'explanation', and 'why_best' fields entirely in ${langName} language. Do not use English for these text fields.
+      
       Return ONLY a JSON object strictly following this structure:
       {
         "calories": <number: calculated total daily calories>,
         "bmi": <number: calculated BMI>,
-        "status": "<string: BMI status>",
-        "explanation": "<string: explanation of diet>",
-        "why_best": "<string: why it's best>"
+        "status": "<string: BMI status in ${langName}>",
+        "explanation": "<string: explanation of diet in ${langName}>",
+        "why_best": "<string: why it's best in ${langName}>"
       }`;
       
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -226,11 +314,11 @@ export default function RegisterDetailsScreen() {
             <View style={styles.formContainer}>
               {currentStep === 'form' ? (
                 <>
-                  <Text style={styles.title}>Tell us about you</Text>
+                  <Text style={styles.title}>{t.title}</Text>
 
                   <View style={styles.row}>
                     <View style={[styles.inputContainer, { flex: 1, marginRight: 10 }]}>
-                      <Text style={styles.inputLabel}>Age</Text>
+                      <Text style={styles.inputLabel}>{t.age}</Text>
                       <View style={[styles.inputWrapper, ageError ? styles.inputWrapperError : null]}>
                         <TextInput style={styles.input} placeholder="e.g. 25" placeholderTextColor="#A9A9A9" value={age} onChangeText={(text) => { setAge(text); if (ageError) setAgeError(''); }} keyboardType="numeric" />
                       </View>
@@ -238,7 +326,7 @@ export default function RegisterDetailsScreen() {
                     </View>
 
                     <View style={[styles.inputContainer, { flex: 1, marginLeft: 10 }]}>
-                      <Text style={styles.inputLabel}>Height (cm)</Text>
+                      <Text style={styles.inputLabel}>{t.heightLabel}</Text>
                       <View style={[styles.inputWrapper, heightError ? styles.inputWrapperError : null]}>
                         <TextInput style={styles.input} placeholder="e.g. 175" placeholderTextColor="#A9A9A9" value={heightVal} onChangeText={(text) => { setHeightVal(text); if (heightError) setHeightError(''); }} keyboardType="numeric" />
                       </View>
@@ -247,7 +335,7 @@ export default function RegisterDetailsScreen() {
                   </View>
 
                   <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Weight (kg)</Text>
+                    <Text style={styles.inputLabel}>{t.weightLabel}</Text>
                     <View style={[styles.inputWrapper, weightError ? styles.inputWrapperError : null]}>
                       <TextInput style={styles.input} placeholder="e.g. 70" placeholderTextColor="#A9A9A9" value={weight} onChangeText={(text) => { setWeight(text); if (weightError) setWeightError(''); }} keyboardType="numeric" />
                     </View>
@@ -255,7 +343,7 @@ export default function RegisterDetailsScreen() {
                   </View>
 
                   <View style={styles.inputContainer}>
-                    <Text style={styles.inputLabel}>Purpose</Text>
+                    <Text style={styles.inputLabel}>{t.purpose}</Text>
                     <View style={styles.purposeContainer}>
                       {PURPOSES.map((item) => (
                         <TouchableOpacity
@@ -270,12 +358,12 @@ export default function RegisterDetailsScreen() {
                   </View>
 
                   <TouchableOpacity activeOpacity={0.8} style={[styles.nextButton, loading && { opacity: 0.7 }]} onPress={handleNext} disabled={loading}>
-                    {loading ? <ActivityIndicator size="small" color="#7EB93C" /> : <Text style={styles.nextButtonText}>Calculate Diet</Text>}
+                    {loading ? <ActivityIndicator size="small" color="#7EB93C" /> : <Text style={styles.nextButtonText}>{t.calcDiet}</Text>}
                   </TouchableOpacity>
                 </>
               ) : (
                 <>
-                  <Text style={styles.title}>Your AI Diet Plan</Text>
+                  <Text style={styles.title}>{t.aiPlanTitle}</Text>
 
                   <View style={styles.planCard}>
                     <View style={styles.planMetricRow}>
@@ -290,15 +378,15 @@ export default function RegisterDetailsScreen() {
                       </View>
                     </View>
 
-                    <Text style={styles.planSubtitle}>How it helps you</Text>
+                    <Text style={styles.planSubtitle}>{t.howItHelps}</Text>
                     <Text style={styles.planText}>{aiPlan?.explanation}</Text>
 
-                    <Text style={styles.planSubtitle}>Why it's the best option</Text>
+                    <Text style={styles.planSubtitle}>{t.whyBest}</Text>
                     <Text style={styles.planText}>{aiPlan?.why_best}</Text>
                   </View>
 
                   <TouchableOpacity activeOpacity={0.8} style={[styles.nextButton, loading && { opacity: 0.7 }]} onPress={() => registerUser(aiPlan?.calories || 2000)} disabled={loading}>
-                    {loading ? <ActivityIndicator size="small" color="#7EB93C" /> : <Text style={styles.nextButtonText}>Accept Plan & Start</Text>}
+                    {loading ? <ActivityIndicator size="small" color="#7EB93C" /> : <Text style={styles.nextButtonText}>{t.acceptStart}</Text>}
                   </TouchableOpacity>
                 </>
               )}
@@ -319,9 +407,9 @@ export default function RegisterDetailsScreen() {
             <View style={styles.offerIconContainer}>
               <Ionicons name="sparkles" size={40} color="#FFF" />
             </View>
-            <Text style={styles.offerModalTitle}>AI Diet Plan</Text>
+            <Text style={styles.offerModalTitle}>{t.aiOfferTitle}</Text>
             <Text style={styles.offerModalText}>
-              Would you like us to create a highly personalized, AI-generated diet plan based on your unique body metrics and goals?
+              {t.aiOfferDesc}
             </Text>
             
             <View style={styles.offerButtonsContainer}>
@@ -332,7 +420,7 @@ export default function RegisterDetailsScreen() {
                   registerUser(2000);
                 }}
               >
-                <Text style={styles.offerBtnRejectText}>No, thanks</Text>
+                <Text style={styles.offerBtnRejectText}>{t.noThanks}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.offerBtn, styles.offerBtnAccept]}
@@ -341,7 +429,7 @@ export default function RegisterDetailsScreen() {
                   await handleAcceptAI();
                 }}
               >
-                <Text style={styles.offerBtnAcceptText}>Yes, please!</Text>
+                <Text style={styles.offerBtnAcceptText}>{t.yesPlease}</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
