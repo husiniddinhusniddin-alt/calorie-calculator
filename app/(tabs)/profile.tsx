@@ -2,12 +2,12 @@ import { MockStore } from '@/constants/store';
 import { supabase } from '@/constants/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
-  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -18,8 +18,6 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { supabase } from '@/constants/supabase';
 
 const translations = {
   en: {
@@ -92,6 +90,9 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
+      // Sync latest avatar from MockStore whenever the tab is focused
+      setProfileImage(MockStore.profileImage);
+
       const loadStats = async () => {
         setIsLoadingStats(true);
         const { data: userData } = await supabase.auth.getUser();

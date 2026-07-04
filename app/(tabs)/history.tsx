@@ -182,12 +182,33 @@ export default function HistoryScreen() {
           if (entry.meal_type === 'dinner') icon = '🥩';
           if (entry.meal_type === 'snack') icon = '🍎';
 
+          // Parse food names from items — handles all storage formats
           let itemsDesc = '';
-          if (typeof entry.items === 'string') {
-            try {
-              const parsed = JSON.parse(entry.items);
-              itemsDesc = parsed.map((it: any) => it.name).join(', ');
-            } catch (e) {}
+          try {
+            let parsed: any[] = [];
+            if (Array.isArray(entry.items)) {
+              // Already an array (Supabase jsonb column)
+              parsed = entry.items;
+            } else if (typeof entry.items === 'string' && entry.items.trim().startsWith('[')) {
+              // JSON string array
+              parsed = JSON.parse(entry.items);
+            }
+            if (parsed.length > 0) {
+              itemsDesc = parsed
+                .map((it: any) => {
+                  if (typeof it === 'string') return it;           // plain string item
+                  if (it?.name) return it.name;                    // {name, calories, ...}
+                  if (it?.title) return it.title;                  // {title, ...}
+                  return '';
+                })
+                .filter(Boolean)
+                .join(', ');
+            }
+          } catch (e) {
+            // Fallback: if items is a plain descriptive string use it directly
+            if (typeof entry.items === 'string' && entry.items.length > 0) {
+              itemsDesc = entry.items;
+            }
           }
 
           if (entry.calories > 0 || itemsDesc !== '') {
