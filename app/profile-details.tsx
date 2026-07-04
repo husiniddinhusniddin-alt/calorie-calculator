@@ -108,6 +108,8 @@ export default function ProfileDetailsScreen() {
   const [age, setAge] = useState(MockStore.age ? MockStore.age.toString() : '');
   const [dob, setDob] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
+  // Stores the raw storage path (e.g. userId/123.jpg) used when saving to DB
+  const [profileImagePath, setProfileImagePath] = useState<string | null>(null);
 
   const [originalValues, setOriginalValues] = useState({
     name: MockStore.name || 'User',
@@ -142,8 +144,19 @@ export default function ProfileDetailsScreen() {
         const fetchedWeight = (profile.current_weight || MockStore.currentWeight).toString();
         const fetchedAge = (profile.age || MockStore.age || '').toString();
         const fetchedDob = profile.dob || '';
-        const fetchedProfileImage = profile.profile_image || MockStore.profileImage;
+        const rawPath = profile.profile_image || null;
+        // Convert stored path → permanent public URL (public bucket)
+        let fetchedProfileImage: string | null = MockStore.profileImage;
+        if (rawPath) {
+          if (rawPath.startsWith('http')) {
+            fetchedProfileImage = rawPath; // legacy full URL
+          } else {
+            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(rawPath);
+            fetchedProfileImage = urlData.publicUrl;
+          }
+        }
 
+        setProfileImagePath(rawPath); // keep raw path for DB saves
         setName(fetchedName);
         setEmail(fetchedEmail);
         setPhone(fetchedPhone);
@@ -208,7 +221,7 @@ export default function ProfileDetailsScreen() {
           age: parsedAge,
           current_weight: parsedWeight,
           dob: dob.trim() || null,
-          profile_image: profileImage,
+          profile_image: profileImagePath, // save raw path, not signed URL
         }).eq('id', user.id);
         
         if (error) {
@@ -231,7 +244,7 @@ export default function ProfileDetailsScreen() {
     }, 1500);
   };
 
-  // Profile Image Picker
+  // Profile Image Picker — uploads to Supabase Storage, saves path to DB, uses signed URL for display
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -247,7 +260,42 @@ export default function ProfileDetailsScreen() {
     });
 
     if (!result.canceled && result.assets && result.assets[0].uri) {
-      setProfileImage(result.assets[0].uri);
+      const localUri = result.assets[0].uri;
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Unique storage path: avatars/<userId>/<timestamp>.<ext>
+        const ext = localUri.split('.').pop()?.split('?')[0] || 'jpg';
+        const storagePath = `${user.id}/${Date.now()}.${ext}`;
+        const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+        // Fetch local file as Blob and upload
+        const response = await fetch(localUri);
+        const blob = await response.blob();
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(storagePath, blob, { contentType, upsert: true });
+
+        if (uploadError) {
+          console.warn('Avatar upload error:', uploadError.message);
+          alert('Failed to upload image: ' + uploadError.message);
+          return;
+        }
+
+        // Get permanent public URL (public bucket)
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(storagePath);
+        const publicUrl = urlData.publicUrl;
+
+        setProfileImagePath(storagePath); // path for DB (via handleSave)
+        setProfileImage(publicUrl);       // public URL for display
+
+      } catch (err) {
+        console.warn('Failed to upload avatar:', err);
+        alert('Image upload failed. Please try again.');
+      }
     }
   };
 

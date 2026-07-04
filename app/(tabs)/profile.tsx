@@ -1,4 +1,5 @@
 import { MockStore } from '@/constants/store';
+import { supabase } from '@/constants/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -160,10 +161,21 @@ export default function ProfileScreen() {
         .maybeSingle();
 
       if (data) {
+        // Convert stored storage path → permanent public URL (public bucket)
+        const rawPath = data.profile_image;
+        let displayImage: string | null = MockStore.profileImage;
+        if (rawPath) {
+          if (rawPath.startsWith('http')) {
+            displayImage = rawPath; // already a full URL (legacy)
+          } else {
+            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(rawPath);
+            displayImage = urlData.publicUrl;
+          }
+        }
         MockStore.update({
           name: data.name || MockStore.name,
           email: data.email || MockStore.email,
-          profileImage: data.profile_image || MockStore.profileImage,
+          profileImage: displayImage,
           targetWeight: data.target_weight || MockStore.targetWeight,
           currentWeight: data.current_weight || MockStore.currentWeight,
           age: data.age || MockStore.age,
@@ -223,7 +235,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // Profile Image Picker
+  // Profile Image Picker — uploads to Supabase Storage, saves path, displays public URL
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -239,19 +251,42 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled && result.assets && result.assets[0].uri) {
-      const selectedUri = result.assets[0].uri;
-      MockStore.update({ profileImage: selectedUri });
+      const localUri = result.assets[0].uri;
 
-      // Update image url in Supabase profiles table
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase.from('profiles').update({
-            profile_image: selectedUri,
-          }).eq('id', user.id);
+        if (!user) return;
+
+        // Unique storage path: userId/timestamp.ext
+        const ext = localUri.split('.').pop()?.split('?')[0] || 'jpg';
+        const storagePath = `${user.id}/${Date.now()}.${ext}`;
+        const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+        // Fetch local file as Blob and upload
+        const response = await fetch(localUri);
+        const blob = await response.blob();
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(storagePath, blob, { contentType, upsert: true });
+
+        if (uploadError) {
+          console.warn('Avatar upload error:', uploadError.message);
+          alert('Failed to upload image: ' + uploadError.message);
+          return;
         }
+
+        // Get permanent public URL (public bucket)
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(storagePath);
+        const publicUrl = urlData.publicUrl;
+
+        // Save path to DB, update MockStore with public URL
+        await supabase.from('profiles').update({ profile_image: storagePath }).eq('id', user.id);
+        MockStore.update({ profileImage: publicUrl });
+
       } catch (err) {
-        console.warn('Failed to update avatar in DB:', err);
+        console.warn('Failed to upload avatar:', err);
+        alert('Image upload failed. Please try again.');
       }
     }
   };
