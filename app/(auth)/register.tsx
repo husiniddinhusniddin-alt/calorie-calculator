@@ -33,8 +33,69 @@ const COUNTRIES = [
   { code: '+44', flag: '🇬🇧', name: 'United Kingdom' },
 ];
 
+const translations = {
+  en: {
+    createAccount: "Create an account",
+    emailLabel: "Email",
+    passwordLabel: "Password",
+    phoneLabel: "Phone",
+    emailPlaceholder: "Enter your email",
+    phonePlaceholder: "Cell number",
+    emailReq: "Please enter your email!",
+    emailInvalid: "Please enter a valid email address!",
+    phoneReq: "Please enter your phone number!",
+    phoneUzbekFormat: "Phone must have 9 digits (e.g., 901234567)!",
+    phoneInvalid: "Please enter a valid phone number!",
+    passwordReq: "Please enter your password!",
+    passwordLength: "Password must be at least 6 characters!",
+    nextStep: "Next step",
+    alreadyHaveAccount: "Already have an account? ",
+    loginLink: "Log In",
+    selectCountry: "Select Country",
+  },
+  ru: {
+    createAccount: "Создать аккаунт",
+    emailLabel: "Email",
+    passwordLabel: "Пароль",
+    phoneLabel: "Телефон",
+    emailPlaceholder: "Введите ваш email",
+    phonePlaceholder: "Номер телефона",
+    emailReq: "Пожалуйста, введите ваш email!",
+    emailInvalid: "Пожалуйста, введите правильный email!",
+    phoneReq: "Пожалуйста, введите ваш номер телефона!",
+    phoneUzbekFormat: "Номер телефона должен состоять из 9 цифр!",
+    phoneInvalid: "Пожалуйста, введите правильный номер телефона!",
+    passwordReq: "Пожалуйста, введите пароль!",
+    passwordLength: "Пароль должен состоять минимум из 6 символов!",
+    nextStep: "Следующий шаг",
+    alreadyHaveAccount: "Уже есть аккаунт? ",
+    loginLink: "Войти",
+    selectCountry: "Выберите страну",
+  },
+  uz: {
+    createAccount: "Yangi akkaunt yaratish",
+    emailLabel: "Email",
+    passwordLabel: "Parol",
+    phoneLabel: "Telefon",
+    emailPlaceholder: "Emailingizni kiriting",
+    phonePlaceholder: "Telefon raqami",
+    emailReq: "Iltimos, email manzilingizni kiriting!",
+    emailInvalid: "Iltimos, to'g'ri email manzili kiriting!",
+    phoneReq: "Iltimos, telefon raqamingizni kiriting!",
+    phoneUzbekFormat: "Telefon raqami 9 ta raqamdan iborat bo'lishi kerak (masalan: 901234567)!",
+    phoneInvalid: "Iltimos, to'g'ri telefon raqami kiriting!",
+    passwordReq: "Iltimos, parolingizni kiriting!",
+    passwordLength: "Parol kamida 6 ta belgidan iborat bo'lishi kerak!",
+    nextStep: "Keyingi qadam",
+    alreadyHaveAccount: "Akkauntingiz bormi? ",
+    loginLink: "Kirish",
+    selectCountry: "Davlatni tanlang",
+  }
+};
+
 export default function RegisterScreen() {
   const router = useRouter();
+  const [language, setLanguage] = useState<'en' | 'ru' | 'uz'>(MockStore.language as 'en' | 'ru' | 'uz');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -47,6 +108,8 @@ export default function RegisterScreen() {
   const [phoneError, setPhoneError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
+  const t = translations[language];
+
   const handleRegister = async () => {
     if (loading) return;
     
@@ -55,33 +118,33 @@ export default function RegisterScreen() {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
 
     if (!email.trim()) {
-      setEmailError('Iltimos, email manzilingizni kiriting!');
+      setEmailError(t.emailReq);
       isValid = false;
     } else if (!emailRegex.test(email.trim())) {
-      setEmailError('Iltimos, to\'g\'ri email manzili kiriting!');
+      setEmailError(t.emailInvalid);
       isValid = false;
     } else {
       setEmailError('');
     }
 
     if (!phone.trim()) {
-      setPhoneError('Iltimos, telefon raqamingizni kiriting!');
+      setPhoneError(t.phoneReq);
       isValid = false;
     } else if (selectedCountry.code === '+998' && cleanPhone.length !== 9) {
-      setPhoneError('Telefon raqami 9 ta raqamdan iborat bo\'lishi kerak (masalan: 901234567)!');
+      setPhoneError(t.phoneUzbekFormat);
       isValid = false;
     } else if (cleanPhone.length < 7 || cleanPhone.length > 15) {
-      setPhoneError('Iltimos, to\'g\'ri telefon raqami kiriting!');
+      setPhoneError(t.phoneInvalid);
       isValid = false;
     } else {
       setPhoneError('');
     }
 
     if (!password.trim()) {
-      setPasswordError('Iltimos, parolingizni kiriting!');
+      setPasswordError(t.passwordReq);
       isValid = false;
     } else if (password.trim().length < 6) {
-      setPasswordError('Parol kamida 6 ta belgidan iborat bo\'lishi kerak!');
+      setPasswordError(t.passwordLength);
       isValid = false;
     } else {
       setPasswordError('');
@@ -134,15 +197,15 @@ export default function RegisterScreen() {
 
             {/* Form Content */}
             <View style={styles.formContainer}>
-              <Text style={styles.title}>Create an account</Text>
+              <Text style={styles.title}>{t.createAccount}</Text>
 
               {/* Email Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Email</Text>
+                <Text style={styles.inputLabel}>{t.emailLabel}</Text>
                 <View style={[styles.inputWrapper, emailError ? styles.inputWrapperError : null]}>
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter your email"
+                    placeholder={t.emailPlaceholder}
                     placeholderTextColor="#A9A9A9"
                     value={email}
                     onChangeText={(text) => {
@@ -158,7 +221,7 @@ export default function RegisterScreen() {
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Password</Text>
+                <Text style={styles.inputLabel}>{t.passwordLabel}</Text>
                 <View style={[styles.inputWrapper, passwordError ? styles.inputWrapperError : null]}>
                   <TextInput
                     style={styles.input}
@@ -188,7 +251,7 @@ export default function RegisterScreen() {
 
               {/* Phone Input with Country Code Selector */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Phone</Text>
+                <Text style={styles.inputLabel}>{t.phoneLabel}</Text>
                 <View style={[styles.phoneWrapper, phoneError ? styles.phoneWrapperError : null]}>
                   <TouchableOpacity 
                     style={styles.countryCodeContainer}
@@ -200,7 +263,7 @@ export default function RegisterScreen() {
                   </TouchableOpacity>
                   <TextInput
                     style={[styles.input, styles.phoneInput]}
-                    placeholder="Cell number"
+                    placeholder={t.phonePlaceholder}
                     placeholderTextColor="#A9A9A9"
                     value={phone}
                     onChangeText={(text) => {
@@ -222,15 +285,15 @@ export default function RegisterScreen() {
                 {loading ? (
                   <ActivityIndicator size="small" color="#7EB93C" />
                 ) : (
-                  <Text style={styles.nextButtonText}>Next step</Text>
+                  <Text style={styles.nextButtonText}>{t.nextStep}</Text>
                 )}
               </TouchableOpacity>
 
               {/* Toggle to Login */}
               <View style={styles.footerContainer}>
-                <Text style={styles.footerText}>Already have an account? </Text>
+                <Text style={styles.footerText}>{t.alreadyHaveAccount}</Text>
                 <TouchableOpacity onPress={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/login'))}>
-                  <Text style={styles.footerLink}>Log In</Text>
+                  <Text style={styles.footerLink}>{t.loginLink}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -251,7 +314,7 @@ export default function RegisterScreen() {
           onPress={() => setShowCountryModal(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Country / Davlatni tanlang</Text>
+            <Text style={styles.modalTitle}>{t.selectCountry}</Text>
             <ScrollView style={styles.countryList} showsVerticalScrollIndicator={false}>
               {COUNTRIES.map((item) => (
                 <TouchableOpacity

@@ -19,6 +19,8 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { supabase } from '@/constants/supabase';
+
 const translations = {
   en: {
     myProfile: 'My Profile', weight: 'Weight', height: 'Height', age: 'Age', activeTargetGoal: 'ACTIVE TARGET GOAL', target: 'Target',
@@ -42,7 +44,6 @@ const translations = {
     logOut: 'Chiqish', days: 'Kun', confirmLogout: 'Chiqish', areYouSureLogout: 'Haqiqatan ham tizimdan chiqmoqchimisiz?', cancel: 'Bekor qilish', yes: 'Ha', dayStreak: 'Kunlik seriya', avgKcal: 'O\'rtacha kkal', goalDays: 'Maqsadli kunlar'
   }
 };
-
 
 export default function ProfileScreen() {
   const router = useRouter();

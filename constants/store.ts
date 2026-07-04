@@ -40,7 +40,7 @@ export const MockStore = {
   weightUnit: 'kg' as 'kg' | 'lbs',
   heightUnit: 'cm' as 'cm' | 'inches',
   energyUnit: 'kcal' as 'kcal' | 'kJ',
-  listeners: [] as Array<() => void>,
+  listeners: [] as (() => void)[],
   subscribe(listener: () => void) {
     this.listeners.push(listener);
     return () => {

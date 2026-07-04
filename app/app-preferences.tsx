@@ -6,15 +6,59 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-} from 'react-native';
+ useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, Snackbar, Portal } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 import { MockStore } from '@/constants/store';
 import { supabase } from '@/constants/supabase';
+
+const translations = {
+  en: {
+    appPrefs: 'App Preferences',
+    measureUnits: 'Measurement Units',
+    weightUnit: 'Weight Unit',
+    heightUnit: 'Height Unit',
+    energyUnit: 'Energy Unit',
+    language: 'Language',
+    appTheme: 'App Theme',
+    savePrefs: 'Save Preferences',
+    prefsUpdated: 'App preferences updated! 🎉',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeSystem: 'System'
+  },
+  ru: {
+    appPrefs: 'Настройки',
+    measureUnits: 'Единицы измерения',
+    weightUnit: 'Единица веса',
+    heightUnit: 'Единица роста',
+    energyUnit: 'Единица энергии',
+    language: 'Язык',
+    appTheme: 'Тема оформления',
+    savePrefs: 'Сохранить',
+    prefsUpdated: 'Настройки обновлены! 🎉',
+    themeLight: 'Светлая',
+    themeDark: 'Темная',
+    themeSystem: 'Системная'
+  },
+  uz: {
+    appPrefs: 'Ilova sozlamalari',
+    measureUnits: 'O\'lchov birliklari',
+    weightUnit: 'Vazn birligi',
+    heightUnit: 'Bo\'y birligi',
+    energyUnit: 'Energiya birligi',
+    language: 'Til',
+    appTheme: 'Mavzu',
+    savePrefs: 'Saqlash',
+    prefsUpdated: 'Sozlamalar yangilandi! 🎉',
+    themeLight: 'Yorug\'',
+    themeDark: 'Qorong\'i',
+    themeSystem: 'Tizim'
+  }
+};
 
 export default function AppPreferencesScreen() {
   const router = useRouter();
@@ -23,6 +67,7 @@ export default function AppPreferencesScreen() {
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>(MockStore.energyUnit || 'kcal');
   const [appTheme, setAppTheme] = useState<'light' | 'dark' | 'system'>(MockStore.appTheme);
   const [language, setLanguage] = useState<'en' | 'ru' | 'uz'>(MockStore.language);
+  const t = translations[language as keyof typeof translations] || translations.en;
 
   const systemColorScheme = useColorScheme();
   const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
@@ -83,18 +128,18 @@ export default function AppPreferencesScreen() {
           >
             <Ionicons name="arrow-back" size={24} color={theme.textSecondary} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.textSecondary }]}>App Preferences</Text>
+          <Text style={[styles.headerTitle, { color: theme.textSecondary }]}>{t.appPrefs}</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Units Card */}
           <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>Measurement Units</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>{t.measureUnits}</Text>
 
             {/* Weight Unit */}
             <View style={styles.preferenceRow}>
-              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Weight Unit</Text>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>{t.weightUnit}</Text>
               <View style={[styles.segmentedControl, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}>
                 <TouchableOpacity
                   style={[styles.segmentBtn, weightUnit === 'kg' && styles.segmentBtnActive]}
@@ -115,7 +160,7 @@ export default function AppPreferencesScreen() {
 
             {/* Height Unit */}
             <View style={styles.preferenceRow}>
-              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Height Unit</Text>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>{t.heightUnit}</Text>
               <View style={[styles.segmentedControl, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}>
                 <TouchableOpacity
                   style={[styles.segmentBtn, heightUnit === 'cm' && styles.segmentBtnActive]}
@@ -136,7 +181,7 @@ export default function AppPreferencesScreen() {
 
             {/* Energy Unit */}
             <View style={styles.preferenceRow}>
-              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Energy Unit</Text>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>{t.energyUnit}</Text>
               <View style={[styles.segmentedControl, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}>
                 <TouchableOpacity
                   style={[styles.segmentBtn, energyUnit === 'kcal' && styles.segmentBtnActive]}
@@ -157,7 +202,7 @@ export default function AppPreferencesScreen() {
 
             {/* Language */}
             <View style={styles.preferenceRow}>
-              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>Language</Text>
+              <Text style={[styles.prefLabel, { color: theme.textPrimary }]}>{t.language}</Text>
               <View style={[styles.segmentedControl, { backgroundColor: theme.segmentBg, borderColor: theme.cardBorder }]}>
                 <TouchableOpacity
                   style={[styles.segmentBtn, language === 'uz' && styles.segmentBtnActive]}
@@ -183,7 +228,7 @@ export default function AppPreferencesScreen() {
 
           {/* Theme Card */}
           <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>App Theme</Text>
+            <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>{t.appTheme}</Text>
             <View style={styles.themeOptions}>
               {(['light', 'dark', 'system'] as const).map((t) => {
                 const isActive = appTheme === t;
@@ -200,7 +245,9 @@ export default function AppPreferencesScreen() {
                       color={isActive ? '#FFFFFF' : theme.segmentText} 
                     />
                     <Text style={[styles.themeBtnText, { color: theme.segmentText }, isActive && styles.themeBtnTextActive]}>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                      {t === 'light' ? translations[language as keyof typeof translations]?.themeLight || 'Light' : 
+                       t === 'dark' ? translations[language as keyof typeof translations]?.themeDark || 'Dark' : 
+                       translations[language as keyof typeof translations]?.themeSystem || 'System'}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -218,7 +265,7 @@ export default function AppPreferencesScreen() {
               {isSaving ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.saveBtnText}>Save Preferences</Text>
+                <Text style={styles.saveBtnText}>{t.savePrefs}</Text>
               )}
             </TouchableOpacity>
           )}
@@ -231,7 +278,7 @@ export default function AppPreferencesScreen() {
             duration={1500}
             style={styles.snackbar}
           >
-            App preferences updated! 🎉
+            {t.prefsUpdated}
           </Snackbar>
         </Portal>
       </SafeAreaView>

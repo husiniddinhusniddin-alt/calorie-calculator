@@ -14,10 +14,79 @@ import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, TextInput, Snackbar, Portal } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/constants/supabase';
+import { MockStore } from '@/constants/store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const translations = {
+  en: {
+    privacySecurity: 'Privacy & Security',
+    changePassword: 'Change Password',
+    currentPass: 'Current Password',
+    newPass: 'New Password',
+    confirmPass: 'Confirm New Password',
+    updatePass: 'Update Password',
+    dangerZone: 'Danger Zone',
+    dangerDesc: 'Once you delete your account, all calorie logs, weight history, and data will be permanently wiped out.',
+    deleteAcc: 'Delete Account',
+    deleteAccConfirm: 'Are you absolutely sure you want to delete your account? This action is permanent and cannot be undone.',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    required: 'Required',
+    passNotMatch: 'Passwords do not match',
+    userNotFound: 'User not found. Please log in again.',
+    incorrectPass: 'Incorrect password',
+    failedUpdate: 'Failed to update: ',
+    unexpectedError: 'An unexpected error occurred.',
+    passUpdated: 'Password updated successfully! 🔒',
+  },
+  ru: {
+    privacySecurity: 'Приватность и Безопасность',
+    changePassword: 'Изменить пароль',
+    currentPass: 'Текущий пароль',
+    newPass: 'Новый пароль',
+    confirmPass: 'Подтвердите пароль',
+    updatePass: 'Обновить пароль',
+    dangerZone: 'Опасная зона',
+    dangerDesc: 'При удалении аккаунта все ваши данные о калориях, весе и активности будут удалены навсегда.',
+    deleteAcc: 'Удалить аккаунт',
+    deleteAccConfirm: 'Вы абсолютно уверены, что хотите удалить свой аккаунт? Это действие необратимо.',
+    cancel: 'Отмена',
+    delete: 'Удалить',
+    required: 'Обязательно',
+    passNotMatch: 'Пароли не совпадают',
+    userNotFound: 'Пользователь не найден. Пожалуйста, войдите снова.',
+    incorrectPass: 'Неверный пароль',
+    failedUpdate: 'Ошибка обновления: ',
+    unexpectedError: 'Произошла непредвиденная ошибка.',
+    passUpdated: 'Пароль успешно обновлен! 🔒',
+  },
+  uz: {
+    privacySecurity: 'Xavfsizlik va Maxfiylik',
+    changePassword: 'Parolni o\'zgartirish',
+    currentPass: 'Joriy parol',
+    newPass: 'Yangi parol',
+    confirmPass: 'Yangi parolni tasdiqlang',
+    updatePass: 'Parolni yangilash',
+    dangerZone: 'Xavfli hudud',
+    dangerDesc: 'Hisobni o\'chirganingizdan so\'ng, barcha kaloriya jurnallari, vazn tarixi va ma\'lumotlar butunlay o\'chiriladi.',
+    deleteAcc: 'Hisobni o\'chirish',
+    deleteAccConfirm: 'Hisobingizni o\'chirishga ishonchingiz komilmi? Bu harakatni ortga qaytarib bo\'lmaydi.',
+    cancel: 'Bekor qilish',
+    delete: 'O\'chirish',
+    required: 'Majburiy',
+    passNotMatch: 'Parollar mos emas',
+    userNotFound: 'Foydalanuvchi topilmadi. Iltimos, qaytadan kiring.',
+    incorrectPass: 'Noto\'g\'ri parol',
+    failedUpdate: 'Yangilashda xatolik: ',
+    unexpectedError: 'Kutilmagan xatolik yuz berdi.',
+    passUpdated: 'Parol muvaffaqiyatli yangilandi! 🔒',
+  }
+};
 
 export default function PrivacySecurityScreen() {
   const router = useRouter();
+  const language = MockStore.language || 'en';
+  const t = translations[language as keyof typeof translations] || translations.en;
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,18 +103,18 @@ export default function PrivacySecurityScreen() {
     let hasError = false;
     
     if (!currentPassword) {
-      setCurrentPasswordError('Required');
+      setCurrentPasswordError(t.required);
       hasError = true;
     }
     if (!newPassword) {
-      setNewPasswordError('Required');
+      setNewPasswordError(t.required);
       hasError = true;
     }
     if (!confirmPassword) {
-      setConfirmPasswordError('Required');
+      setConfirmPasswordError(t.required);
       hasError = true;
     } else if (newPassword && newPassword !== confirmPassword) {
-      setConfirmPasswordError('Passwords do not match');
+      setConfirmPasswordError(t.passNotMatch);
       hasError = true;
     }
 
@@ -63,7 +132,7 @@ export default function PrivacySecurityScreen() {
       // 1. Get the current user to find their email
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !user.email) {
-        setSnackbarMsg('User not found. Please log in again.');
+        setSnackbarMsg(t.userNotFound);
         setSnackbarVisible(true);
         setIsLoading(false);
         return;
@@ -76,7 +145,7 @@ export default function PrivacySecurityScreen() {
       });
 
       if (signInError) {
-        setCurrentPasswordError('Incorrect password');
+        setCurrentPasswordError(t.incorrectPass);
         setIsLoading(false);
         return;
       }
@@ -84,21 +153,21 @@ export default function PrivacySecurityScreen() {
       // 3. Current password is correct, now update to new password
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) {
-        setSnackbarMsg('Failed to update: ' + updateError.message);
+        setSnackbarMsg(t.failedUpdate + updateError.message);
         setSnackbarVisible(true);
         setIsLoading(false);
         return;
       }
     } catch (err) {
       console.warn('Failed to update password:', err);
-      setSnackbarMsg('An unexpected error occurred.');
+      setSnackbarMsg(t.unexpectedError);
       setSnackbarVisible(true);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(false);
-    setSnackbarMsg('Password updated successfully! 🔒');
+    setSnackbarMsg(t.passUpdated);
     setSnackbarVisible(true);
     setCurrentPassword('');
     setNewPassword('');
@@ -107,12 +176,12 @@ export default function PrivacySecurityScreen() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'Are you absolutely sure you want to delete your account? This action is permanent and cannot be undone.',
+      t.deleteAcc,
+      t.deleteAccConfirm,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.cancel, style: 'cancel' },
         { 
-          text: 'Delete', 
+          text: t.delete, 
           style: 'destructive',
           onPress: async () => {
             // Since we can't delete auth.users from client without service_role,
@@ -169,18 +238,18 @@ export default function PrivacySecurityScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="#3A5C18" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Privacy & Security</Text>
+          <Text style={styles.headerTitle}>{t.privacySecurity}</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Password Section */}
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Change Password</Text>
+            <Text style={styles.sectionTitle}>{t.changePassword}</Text>
             
             <TextInput
               mode="outlined"
-              label="Current Password"
+              label={t.currentPass}
               value={currentPassword}
               onChangeText={(text) => {
                 setCurrentPassword(text);
@@ -201,7 +270,7 @@ export default function PrivacySecurityScreen() {
 
             <TextInput
               mode="outlined"
-              label="New Password"
+              label={t.newPass}
               value={newPassword}
               onChangeText={(text) => {
                 setNewPassword(text);
@@ -222,7 +291,7 @@ export default function PrivacySecurityScreen() {
 
             <TextInput
               mode="outlined"
-              label="Confirm New Password"
+              label={t.confirmPass}
               value={confirmPassword}
               onChangeText={(text) => {
                 setConfirmPassword(text);
@@ -250,16 +319,16 @@ export default function PrivacySecurityScreen() {
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.updateBtnText}>Update Password</Text>
+                <Text style={styles.updateBtnText}>{t.updatePass}</Text>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Danger Zone */}
           <View style={[styles.card, styles.dangerCard]}>
-            <Text style={[styles.sectionTitle, { color: '#FF4D4F' }]}>Danger Zone</Text>
+            <Text style={[styles.sectionTitle, { color: '#FF4D4F' }]}>{t.dangerZone}</Text>
             <Text style={styles.dangerDesc}>
-              Once you delete your account, all calorie logs, weight history, and data will be permanently wiped out.
+              {t.dangerDesc}
             </Text>
 
             <TouchableOpacity 
@@ -268,7 +337,7 @@ export default function PrivacySecurityScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="trash-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.deleteBtnText}>Delete Account</Text>
+              <Text style={styles.deleteBtnText}>{t.deleteAcc}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

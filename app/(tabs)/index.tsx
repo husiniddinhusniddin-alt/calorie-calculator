@@ -22,7 +22,31 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Calendar } from 'react-native-calendars';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
+
+LocaleConfig.locales['ru'] = {
+  monthNames: ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'],
+  monthNamesShort: ['Янв.','Фев.','Март','Апр.','Май','Июнь','Июль','Авг.','Сент.','Окт.','Нояб.','Дек.'],
+  dayNames: ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'],
+  dayNamesShort: ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'],
+  today: 'Сегодня'
+};
+
+LocaleConfig.locales['uz'] = {
+  monthNames: ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'],
+  monthNamesShort: ['Yan','Fev','Mar','Apr','May','Iyun','Iyul','Avg','Sen','Okt','Noy','Dek'],
+  dayNames: ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'],
+  dayNamesShort: ['Yak','Dush','Sesh','Chor','Pay','Jum','Shan'],
+  today: 'Bugun'
+};
+
+LocaleConfig.locales['en'] = {
+  monthNames: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+  monthNamesShort: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+  dayNames: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+  dayNamesShort: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+  today: 'Today'
+};
 import Animated, { Easing, FadeInDown, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -60,6 +84,12 @@ const translations = {
     save: 'Save',
     oatmealText: 'Oatmeal with fruits and nuts',
     chopsText: 'Chops with potatoes',
+    editGoalDesc: 'Edit total calories or specific macros. Calories will recalculate automatically.',
+    calories: 'Calories',
+    carbsG: 'Carbs (g)',
+    proteinG: 'Protein (g)',
+    fatG: 'Fat (g)',
+    weekShort: 'W',
   },
   ru: {
     monday: 'Понедельник',
@@ -93,6 +123,12 @@ const translations = {
     save: 'Сохранить',
     oatmealText: 'Овсянка с фруктами и орехами',
     chopsText: 'Отбивные с картофелем',
+    editGoalDesc: 'Измените общие калории или макросы. Калории пересчитаются автоматически.',
+    calories: 'Калории',
+    carbsG: 'Углеводы (г)',
+    proteinG: 'Белки (г)',
+    fatG: 'Жиры (г)',
+    weekShort: 'Н',
   },
   uz: {
     monday: 'Dushanba',
@@ -126,6 +162,12 @@ const translations = {
     save: 'Saqlash',
     oatmealText: 'Mevalar va yong\'oqlar bilan suli bo\'tqasi',
     chopsText: 'Kartoshka bilan otbivnoy',
+    editGoalDesc: 'Umumiy kaloriya yoki makrolarni tahrirlang. Kaloriyalar avtomatik qayta hisoblanadi.',
+    calories: 'Kaloriya',
+    carbsG: 'Uglevodlar (g)',
+    proteinG: 'Oqsillar (g)',
+    fatG: 'Yog\'lar (g)',
+    weekShort: 'H',
   }
 };
 
@@ -430,6 +472,8 @@ export default function DiaryScreen() {
     mealEmptyText: isDark ? '#5A684E' : '#BBBBBB',
   };
 
+  LocaleConfig.defaultLocale = language;
+
   const [meals, setMeals] = useState<any[]>([
     { id: 'breakfast', label: 'Breakfast', color: '#F4C344', calories: 0, items: [], empty: true },
     { id: 'lunch', label: 'Lunch', color: '#7EB93C', calories: 0, items: [], empty: true },
@@ -539,9 +583,9 @@ export default function DiaryScreen() {
   }, [userId, selectedDate]);
 
   const dateObj = new Date(selectedDate);
-  const locale = language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-US';
-  const formattedDayName = dateObj.toLocaleDateString(locale, { weekday: 'long' });
-  const formattedDate = dateObj.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  const locData = LocaleConfig.locales[language] || LocaleConfig.locales['en'];
+  const formattedDayName = locData.dayNames[dateObj.getDay()];
+  const formattedDate = `${dateObj.getDate()} ${locData.monthNamesShort[dateObj.getMonth()]}, ${dateObj.getFullYear()}`;
 
   const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('day');
   const [isFetching, setIsFetching] = useState(true);
@@ -608,18 +652,23 @@ export default function DiaryScreen() {
           .gte('date', startDateStr)
           .lte('date', endDateStr);
 
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(today);
-          d.setDate(today.getDate() - i);
-          const dateStr = d.toISOString().split('T')[0];
-          const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().slice(0, 3);
+        const last7Days = Array.from({ length: 7 }).map((_, i) => {
+           const d = new Date(today);
+           d.setDate(today.getDate() - (6 - i));
+           return d.toISOString().split('T')[0];
+        });
 
+        last7Days.forEach((dateStr) => {
+          const d = new Date(dateStr);
+          const locData = LocaleConfig.locales[language] || LocaleConfig.locales['en'];
+          const dayLabel = locData.dayNamesShort[d.getDay()].toUpperCase();
+          
           const total = (data || [])
             .filter((r: any) => r.date === dateStr)
             .reduce((s: number, r: any) => s + (r.calories || 0), 0);
 
           rows.push({ label: dayLabel, value: total });
-        }
+        });
         maxVal = Math.max(2000, ...rows.map(r => r.value));
 
       } else {
@@ -651,7 +700,7 @@ export default function DiaryScreen() {
             .filter((r: any) => r.date >= s && r.date <= e)
             .reduce((s2: number, r: any) => s2 + (r.calories || 0), 0);
 
-          rows.push({ label: `W${4 - i}`, value: total });
+          rows.push({ label: `${t.weekShort}${4 - i}`, value: total });
         }
         maxVal = Math.max(2000, ...rows.map(r => r.value));
       }
@@ -1049,11 +1098,11 @@ export default function DiaryScreen() {
               <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5, width: '85%' }]}>
                 <Text style={[styles.modalTitle, { color: theme.textPrimary, marginBottom: 8 }]}>{t.updateDailyGoal}</Text>
                 <Text style={{ fontSize: 13, color: theme.textMuted, marginBottom: 20, textAlign: 'center' }}>
-                  Edit total calories or specific macros. Calories will recalculate automatically.
+                  {t.editGoalDesc}
                 </Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
-                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Calories</Text>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>{t.calories}</Text>
                   <TextInput
                     style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
                     keyboardType="numeric"
@@ -1071,7 +1120,7 @@ export default function DiaryScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
-                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Carbs (g)</Text>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>{t.carbsG}</Text>
                   <TextInput
                     style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
                     keyboardType="numeric"
@@ -1087,7 +1136,7 @@ export default function DiaryScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
-                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Protein (g)</Text>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>{t.proteinG}</Text>
                   <TextInput
                     style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
                     keyboardType="numeric"
@@ -1102,8 +1151,8 @@ export default function DiaryScreen() {
                   />
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 20 }}>
-                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Fat (g)</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 24 }}>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>{t.fatG}</Text>
                   <TextInput
                     style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
                     keyboardType="numeric"
@@ -1419,7 +1468,7 @@ export default function DiaryScreen() {
           {scannerStep === 'error' && (
             <View style={[styles.resultContainer, { justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#111' }]}>
               <Ionicons name="warning-outline" size={80} color="#FFD700" style={{ marginBottom: 24 }} />
-              <Text style={{ fontSize: 24, fontWeight: '700', color: '#FFF', textAlign: 'center', marginBottom: 12 }}>We couldn't identify any food.</Text>
+              <Text style={{ fontSize: 24, fontWeight: '700', color: '#FFF', textAlign: 'center', marginBottom: 12 }}>We couldn&apos;t identify any food.</Text>
               <Text style={{ fontSize: 16, color: '#AAA', textAlign: 'center', marginBottom: 40 }}>Please make sure the dish is clearly visible and the photo is of good quality.</Text>
               <View style={{ width: '100%', gap: 16, paddingHorizontal: 20 }}>
                 <TouchableOpacity
@@ -1792,6 +1841,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   chartTitle: {
+    flexShrink: 1,
+    marginRight: 8,
     fontSize: 16,
     fontWeight: '800',
     color: '#1A1A1A',

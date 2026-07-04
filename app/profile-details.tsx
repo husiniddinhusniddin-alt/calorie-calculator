@@ -20,10 +20,69 @@ import * as ImagePicker from 'expo-image-picker';
 import { MockStore } from '@/constants/store';
 import { supabase } from '@/constants/supabase';
 
+const translations = {
+  en: {
+    personalDetails: 'Personal Details',
+    tapChangeAvatar: 'Tap to change avatar',
+    basicInfo: 'Basic Info',
+    fullName: 'Full Name',
+    emailAddr: 'Email Address',
+    phoneNum: 'Phone Number',
+    dob: 'Date of Birth',
+    bodyMetrics: 'Body Metrics',
+    height: 'Height (cm)',
+    age: 'Age',
+    weight: 'Weight (kg)',
+    saveChanges: 'Save Changes',
+    nameEmailEmpty: 'Name and Email cannot be empty.',
+    failedUpdate: 'Failed to update: ',
+    savedSuccess: 'Personal details saved successfully! 🎉',
+    cameraPerm: 'Sorry, we need camera roll permissions to change your avatar!'
+  },
+  ru: {
+    personalDetails: 'Личные данные',
+    tapChangeAvatar: 'Нажмите, чтобы изменить фото',
+    basicInfo: 'Основная инфо',
+    fullName: 'Полное имя',
+    emailAddr: 'Эл. адрес',
+    phoneNum: 'Номер телефона',
+    dob: 'Дата рождения',
+    bodyMetrics: 'Параметры тела',
+    height: 'Рост (см)',
+    age: 'Возраст',
+    weight: 'Вес (кг)',
+    saveChanges: 'Сохранить изменения',
+    nameEmailEmpty: 'Имя и Email не могут быть пустыми.',
+    failedUpdate: 'Ошибка обновления: ',
+    savedSuccess: 'Личные данные успешно сохранены! 🎉',
+    cameraPerm: 'Извините, нужен доступ к галерее для изменения фото!'
+  },
+  uz: {
+    personalDetails: 'Shaxsiy ma\'lumotlar',
+    tapChangeAvatar: 'Rasmni o\'zgartirish uchun bosing',
+    basicInfo: 'Asosiy ma\'lumotlar',
+    fullName: 'Ism sharif',
+    emailAddr: 'Elektron manzil',
+    phoneNum: 'Telefon raqam',
+    dob: 'Tug\'ilgan sana',
+    bodyMetrics: 'Tana o\'lchamlari',
+    height: 'Bo\'yi (sm)',
+    age: 'Yosh',
+    weight: 'Vazn (kg)',
+    saveChanges: 'O\'zgarishlarni saqlash',
+    nameEmailEmpty: 'Ism va Email bo\'sh bo\'lishi mumkin emas.',
+    failedUpdate: 'Yangilashda xatolik: ',
+    savedSuccess: 'Shaxsiy ma\'lumotlar muvaffaqiyatli saqlandi! 🎉',
+    cameraPerm: 'Kechirasiz, rasmni o\'zgartirish uchun galereyaga ruxsat kerak!'
+  }
+};
+
 export default function ProfileDetailsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const language = MockStore.language || 'en';
+  const t = translations[language as keyof typeof translations] || translations.en;
 
   // Theme Colors
   const theme = {
@@ -129,7 +188,7 @@ export default function ProfileDetailsScreen() {
 
   const handleSave = async () => {
     if (!name.trim() || !email.trim()) {
-      setSnackbarMsg('Name and Email cannot be empty.');
+      setSnackbarMsg(t.nameEmailEmpty);
       setSnackbarVisible(true);
       return;
     }
@@ -167,7 +226,7 @@ export default function ProfileDetailsScreen() {
         
         if (error) {
           console.warn('Update error:', error);
-          setSnackbarMsg('Failed to update: ' + error.message);
+          setSnackbarMsg(t.failedUpdate + error.message);
           setSnackbarVisible(true);
           setIsSaving(false);
           return;
@@ -177,7 +236,7 @@ export default function ProfileDetailsScreen() {
       console.warn('Failed to save profile to DB:', err);
     }
 
-    setSnackbarMsg('Personal details saved successfully! 🎉');
+    setSnackbarMsg(t.savedSuccess);
     setSnackbarVisible(true);
     setTimeout(() => {
       setIsSaving(false);
@@ -189,7 +248,7 @@ export default function ProfileDetailsScreen() {
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      alert('Sorry, we need camera roll permissions to change your avatar!');
+      alert(t.cameraPerm);
       return;
     }
 
@@ -267,7 +326,7 @@ export default function ProfileDetailsScreen() {
             >
               <Ionicons name="arrow-back" size={24} color="#7EB93C" />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: theme.textBrand }]}>Personal Details</Text>
+            <Text style={[styles.headerTitle, { color: theme.textBrand }]}>{t.personalDetails}</Text>
             <View style={{ width: 40 }} />
           </View>
 
@@ -292,15 +351,15 @@ export default function ProfileDetailsScreen() {
                   <Ionicons name="camera" size={14} color="#FFFFFF" />
                 </View>
               </TouchableOpacity>
-              <Text style={[styles.avatarTipText, { color: theme.textMuted }]}>Tap to change avatar</Text>
+              <Text style={[styles.avatarTipText, { color: theme.textMuted }]}>{t.tapChangeAvatar}</Text>
             </View>
 
             <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-              <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>Basic Info</Text>
+              <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.basicInfo}</Text>
 
               <TextInput
                 mode="outlined"
-                label="Full Name"
+                label={t.fullName}
                 value={name}
                 onChangeText={setName}
                 activeOutlineColor="#7EB93C"
@@ -312,7 +371,7 @@ export default function ProfileDetailsScreen() {
 
               <TextInput
                 mode="outlined"
-                label="Email Address"
+                label={t.emailAddr}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -326,7 +385,7 @@ export default function ProfileDetailsScreen() {
 
               <TextInput
                 mode="outlined"
-                label="Phone Number"
+                label={t.phoneNum}
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
@@ -339,7 +398,7 @@ export default function ProfileDetailsScreen() {
 
               <TextInput
                 mode="outlined"
-                label="Date of Birth"
+                label={t.dob}
                 value={dob}
                 onChangeText={setDob}
                 placeholder="YYYY-MM-DD"
@@ -352,13 +411,13 @@ export default function ProfileDetailsScreen() {
             </View>
 
             <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-              <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>Body Metrics</Text>
+              <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>{t.bodyMetrics}</Text>
               
               <View style={styles.row}>
                 <View style={{ flex: 1, marginRight: 8 }}>
                   <TextInput
                     mode="outlined"
-                    label="Height (cm)"
+                    label={t.height}
                     value={height}
                     onChangeText={setHeight}
                     keyboardType="numeric"
@@ -372,7 +431,7 @@ export default function ProfileDetailsScreen() {
                 <View style={{ flex: 1, marginLeft: 8 }}>
                   <TextInput
                     mode="outlined"
-                    label="Age"
+                    label={t.age}
                     value={age}
                     onChangeText={setAge}
                     keyboardType="numeric"
@@ -388,7 +447,7 @@ export default function ProfileDetailsScreen() {
                 <View style={{ flex: 1, marginRight: 8 }}>
                   <TextInput
                     mode="outlined"
-                    label="Weight (kg)"
+                    label={t.weight}
                     value={weight}
                     onChangeText={setWeight}
                     keyboardType="numeric"
@@ -412,7 +471,7 @@ export default function ProfileDetailsScreen() {
                 {isSaving ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text style={styles.saveBtnText}>Save Changes</Text>
+                  <Text style={styles.saveBtnText}>{t.saveChanges}</Text>
                 )}
               </TouchableOpacity>
             )}
