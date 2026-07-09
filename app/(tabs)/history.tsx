@@ -19,6 +19,8 @@ const translations = {
   en: {
     historyTitle: 'History',
     thisWeek: 'This week',
+    lastWeek: 'Last week',
+    weeksAgo: 'weeks ago',
     underGoal: 'Under goal',
     overGoal: 'Over goal',
     today: 'Today',
@@ -33,12 +35,13 @@ const translations = {
     other: 'Other',
     sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat',
     todayLabel: 'Today, ',
-    yesterdayLabel: 'Yesterday, ',
-    noMeals: 'No meals logged.'
+    yesterdayLabel: 'Yesterday, '
   },
   ru: {
     historyTitle: 'История',
     thisWeek: 'На этой неделе',
+    lastWeek: 'Прошлая неделя',
+    weeksAgo: 'нед. назад',
     underGoal: 'Ниже цели',
     overGoal: 'Выше цели',
     today: 'Сегодня',
@@ -53,12 +56,13 @@ const translations = {
     other: 'Другое',
     sun: 'Вс', mon: 'Пн', tue: 'Вт', wed: 'Ср', thu: 'Чт', fri: 'Пт', sat: 'Сб',
     todayLabel: 'Сегодня, ',
-    yesterdayLabel: 'Вчера, ',
-    noMeals: 'Нет записей.'
+    yesterdayLabel: 'Вчера, '
   },
   uz: {
     historyTitle: 'Tarix',
     thisWeek: 'Shu hafta',
+    lastWeek: 'O\'tgan hafta',
+    weeksAgo: 'hafta oldin',
     underGoal: 'Maqsaddan kam',
     overGoal: 'Maqsaddan ko\'p',
     today: 'Bugun',
@@ -73,8 +77,7 @@ const translations = {
     other: 'Boshqa',
     sun: 'Yak', mon: 'Dush', tue: 'Sesh', wed: 'Chor', thu: 'Pay', fri: 'Jum', sat: 'Shan',
     todayLabel: 'Bugun, ',
-    yesterdayLabel: 'Kecha, ',
-    noMeals: 'Ovqatlar qayd etilmagan.'
+    yesterdayLabel: 'Kecha, '
   }
 };
 
@@ -105,6 +108,7 @@ export default function HistoryScreen() {
   const [historyData, setHistoryData] = useState<DayHistory[]>([]);
   const [weekCalories, setWeekCalories] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [weekOffset, setWeekOffset] = useState(0);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -129,12 +133,14 @@ export default function HistoryScreen() {
     if (!userId) return;
     setIsLoading(true);
 
-    // Build the last 7 days array
+    // Build the last 7 days array based on weekOffset
     const last7Days: string[] = [];
-    const today = new Date();
+    const baseDate = new Date();
+    baseDate.setDate(baseDate.getDate() + (weekOffset * 7));
+
     for (let i = 0; i < 7; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() - i);
       last7Days.push(d.toISOString().split('T')[0]);
     }
 
@@ -156,14 +162,18 @@ export default function HistoryScreen() {
     last7Days.forEach((dateStr, i) => {
       const d = new Date(dateStr);
       let displayDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      if (i === 0) displayDate = t.todayLabel + displayDate;
-      else if (i === 1) displayDate = t.yesterdayLabel + displayDate;
+      
+      const isActuallyToday = weekOffset === 0 && i === 0;
+      const isActuallyYesterday = weekOffset === 0 && i === 1;
+
+      if (isActuallyToday) displayDate = t.todayLabel + displayDate;
+      else if (isActuallyYesterday) displayDate = t.yesterdayLabel + displayDate;
 
       grouped[dateStr] = {
         dateObj: d,
         dateStr: dateStr,
         displayDate,
-        isToday: i === 0,
+        isToday: isActuallyToday,
         totalCalories: 0,
         goalCalories: dailyCalorieGoal,
         meals: [],
@@ -182,33 +192,12 @@ export default function HistoryScreen() {
           if (entry.meal_type === 'dinner') icon = '🥩';
           if (entry.meal_type === 'snack') icon = '🍎';
 
-          // Parse food names from items — handles all storage formats
           let itemsDesc = '';
-          try {
-            let parsed: any[] = [];
-            if (Array.isArray(entry.items)) {
-              // Already an array (Supabase jsonb column)
-              parsed = entry.items;
-            } else if (typeof entry.items === 'string' && entry.items.trim().startsWith('[')) {
-              // JSON string array
-              parsed = JSON.parse(entry.items);
-            }
-            if (parsed.length > 0) {
-              itemsDesc = parsed
-                .map((it: any) => {
-                  if (typeof it === 'string') return it;           // plain string item
-                  if (it?.name) return it.name;                    // {name, calories, ...}
-                  if (it?.title) return it.title;                  // {title, ...}
-                  return '';
-                })
-                .filter(Boolean)
-                .join(', ');
-            }
-          } catch (e) {
-            // Fallback: if items is a plain descriptive string use it directly
-            if (typeof entry.items === 'string' && entry.items.length > 0) {
-              itemsDesc = entry.items;
-            }
+          if (typeof entry.items === 'string') {
+            try {
+              const parsed = JSON.parse(entry.items);
+              itemsDesc = parsed.map((it: any) => it.name).join(', ');
+            } catch (e) {}
           }
 
           if (entry.calories > 0 || itemsDesc !== '') {
@@ -239,7 +228,7 @@ export default function HistoryScreen() {
   useFocusEffect(
     React.useCallback(() => {
       loadHistoryFromDB();
-    }, [userId, dailyCalorieGoal, language])
+    }, [userId, dailyCalorieGoal, language, weekOffset])
   );
 
   const systemColorScheme = useColorScheme();
@@ -296,7 +285,24 @@ export default function HistoryScreen() {
 
         {/* Weekly Summary Chart */}
         <Animated.View entering={FadeInDown.duration(500).delay(80)} style={[styles.chartCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-          <Text style={[styles.chartTitle, { color: theme.textMuted }]}>{t.thisWeek}</Text>
+          <View style={styles.chartHeader}>
+            <TouchableOpacity onPress={() => setWeekOffset(prev => prev - 1)} style={styles.weekNavBtn}>
+              <Ionicons name="chevron-back" size={20} color={theme.textMuted} />
+            </TouchableOpacity>
+            
+            <Text style={[styles.chartTitle, { color: theme.textMuted, marginBottom: 0 }]}>
+              {weekOffset === 0 ? t.thisWeek : weekOffset === -1 ? t.lastWeek : `${Math.abs(weekOffset)} ${t.weeksAgo}`}
+            </Text>
+            
+            <TouchableOpacity 
+              onPress={() => setWeekOffset(prev => prev + 1)} 
+              style={[styles.weekNavBtn, weekOffset >= 0 && { opacity: 0.3 }]}
+              disabled={weekOffset >= 0}
+            >
+              <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.barsContainer}>
             {!isLoading && weekCalories.length > 0 ? weekCalories.map((cal, i) => {
               const hasData = cal > 0;
@@ -474,7 +480,7 @@ export default function HistoryScreen() {
                 )}
                 {isExpanded && day.meals.length === 0 && (
                   <View style={styles.mealList}>
-                    <Text style={{color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: 10}}>{t.noMeals}</Text>
+                    <Text style={{color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: 10}}>No meals logged.</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -505,6 +511,15 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     borderWidth: 1.5,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  weekNavBtn: {
+    padding: 4,
   },
   chartTitle: {
     fontSize: 14,

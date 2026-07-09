@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,82 +15,35 @@ import { useRouter } from 'expo-router';
 import { Provider as PaperProvider, TextInput, Snackbar, Portal } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/constants/supabase';
-import { MockStore } from '@/constants/store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const translations = {
-  en: {
-    privacySecurity: 'Privacy & Security',
-    changePassword: 'Change Password',
-    currentPass: 'Current Password',
-    newPass: 'New Password',
-    confirmPass: 'Confirm New Password',
-    updatePass: 'Update Password',
-    dangerZone: 'Danger Zone',
-    dangerDesc: 'Once you delete your account, all calorie logs, weight history, and data will be permanently wiped out.',
-    deleteAcc: 'Delete Account',
-    deleteAccConfirm: 'Are you absolutely sure you want to delete your account? This action is permanent and cannot be undone.',
-    cancel: 'Cancel',
-    delete: 'Delete',
-    required: 'Required',
-    passNotMatch: 'Passwords do not match',
-    userNotFound: 'User not found. Please log in again.',
-    incorrectPass: 'Incorrect password',
-    failedUpdate: 'Failed to update: ',
-    unexpectedError: 'An unexpected error occurred.',
-    passUpdated: 'Password updated successfully! 🔒',
-  },
-  ru: {
-    privacySecurity: 'Приватность и Безопасность',
-    changePassword: 'Изменить пароль',
-    currentPass: 'Текущий пароль',
-    newPass: 'Новый пароль',
-    confirmPass: 'Подтвердите пароль',
-    updatePass: 'Обновить пароль',
-    dangerZone: 'Опасная зона',
-    dangerDesc: 'При удалении аккаунта все ваши данные о калориях, весе и активности будут удалены навсегда.',
-    deleteAcc: 'Удалить аккаунт',
-    deleteAccConfirm: 'Вы абсолютно уверены, что хотите удалить свой аккаунт? Это действие необратимо.',
-    cancel: 'Отмена',
-    delete: 'Удалить',
-    required: 'Обязательно',
-    passNotMatch: 'Пароли не совпадают',
-    userNotFound: 'Пользователь не найден. Пожалуйста, войдите снова.',
-    incorrectPass: 'Неверный пароль',
-    failedUpdate: 'Ошибка обновления: ',
-    unexpectedError: 'Произошла непредвиденная ошибка.',
-    passUpdated: 'Пароль успешно обновлен! 🔒',
-  },
-  uz: {
-    privacySecurity: 'Xavfsizlik va Maxfiylik',
-    changePassword: 'Parolni o\'zgartirish',
-    currentPass: 'Joriy parol',
-    newPass: 'Yangi parol',
-    confirmPass: 'Yangi parolni tasdiqlang',
-    updatePass: 'Parolni yangilash',
-    dangerZone: 'Xavfli hudud',
-    dangerDesc: 'Hisobni o\'chirganingizdan so\'ng, barcha kaloriya jurnallari, vazn tarixi va ma\'lumotlar butunlay o\'chiriladi.',
-    deleteAcc: 'Hisobni o\'chirish',
-    deleteAccConfirm: 'Hisobingizni o\'chirishga ishonchingiz komilmi? Bu harakatni ortga qaytarib bo\'lmaydi.',
-    cancel: 'Bekor qilish',
-    delete: 'O\'chirish',
-    required: 'Majburiy',
-    passNotMatch: 'Parollar mos emas',
-    userNotFound: 'Foydalanuvchi topilmadi. Iltimos, qaytadan kiring.',
-    incorrectPass: 'Noto\'g\'ri parol',
-    failedUpdate: 'Yangilashda xatolik: ',
-    unexpectedError: 'Kutilmagan xatolik yuz berdi.',
-    passUpdated: 'Parol muvaffaqiyatli yangilandi! 🔒',
-  }
-};
+import { MockStore } from '@/constants/store';
 
 export default function PrivacySecurityScreen() {
   const router = useRouter();
-  const language = MockStore.language || 'en';
-  const t = translations[language as keyof typeof translations] || translations.en;
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const colorScheme = useColorScheme();
+  const appTheme = MockStore.appTheme;
+  const isDark = appTheme === 'system' ? colorScheme === 'dark' : appTheme === 'dark';
+
+  // Theme Colors
+  const theme = {
+    background: isDark ? '#0F140A' : '#F7FAF3',
+    cardBackground: isDark ? '#171E10' : '#FFFFFF',
+    cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A2310',
+    textBrand: isDark ? '#8CC33F' : '#3A5C18',
+    textMuted: isDark ? '#9AA88E' : '#6B785E',
+    badgeBackground: isDark ? '#23321A' : '#FAFCF8',
+    badgeBorder: isDark ? '#374B2A' : '#EBF2E5',
+    inputText: isDark ? '#FAFCF8' : '#1A2310',
+    inputBackground: isDark ? '#171E10' : '#FFFFFF',
+    inputOutline: isDark ? '#2A3A1E' : '#EBF2E5',
+    dangerCardBg: isDark ? '#2A1010' : '#FFFBFB',
+    dangerCardBorder: isDark ? '#4A1C1C' : '#FFE0E0',
+  };
 
   const [isLoading, setIsLoading] = useState(false);
   const [currentPasswordError, setCurrentPasswordError] = useState('');
@@ -103,18 +57,18 @@ export default function PrivacySecurityScreen() {
     let hasError = false;
     
     if (!currentPassword) {
-      setCurrentPasswordError(t.required);
+      setCurrentPasswordError('Required');
       hasError = true;
     }
     if (!newPassword) {
-      setNewPasswordError(t.required);
+      setNewPasswordError('Required');
       hasError = true;
     }
     if (!confirmPassword) {
-      setConfirmPasswordError(t.required);
+      setConfirmPasswordError('Required');
       hasError = true;
     } else if (newPassword && newPassword !== confirmPassword) {
-      setConfirmPasswordError(t.passNotMatch);
+      setConfirmPasswordError('Passwords do not match');
       hasError = true;
     }
 
@@ -132,7 +86,7 @@ export default function PrivacySecurityScreen() {
       // 1. Get the current user to find their email
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !user.email) {
-        setSnackbarMsg(t.userNotFound);
+        setSnackbarMsg('User not found. Please log in again.');
         setSnackbarVisible(true);
         setIsLoading(false);
         return;
@@ -145,7 +99,7 @@ export default function PrivacySecurityScreen() {
       });
 
       if (signInError) {
-        setCurrentPasswordError(t.incorrectPass);
+        setCurrentPasswordError('Incorrect password');
         setIsLoading(false);
         return;
       }
@@ -153,21 +107,21 @@ export default function PrivacySecurityScreen() {
       // 3. Current password is correct, now update to new password
       const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
       if (updateError) {
-        setSnackbarMsg(t.failedUpdate + updateError.message);
+        setSnackbarMsg('Failed to update: ' + updateError.message);
         setSnackbarVisible(true);
         setIsLoading(false);
         return;
       }
     } catch (err) {
       console.warn('Failed to update password:', err);
-      setSnackbarMsg(t.unexpectedError);
+      setSnackbarMsg('An unexpected error occurred.');
       setSnackbarVisible(true);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(false);
-    setSnackbarMsg(t.passUpdated);
+    setSnackbarMsg('Password updated successfully! 🔒');
     setSnackbarVisible(true);
     setCurrentPassword('');
     setNewPassword('');
@@ -176,12 +130,12 @@ export default function PrivacySecurityScreen() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      t.deleteAcc,
-      t.deleteAccConfirm,
+      'Delete Account',
+      'Are you absolutely sure you want to delete your account? This action is permanent and cannot be undone.',
       [
-        { text: t.cancel, style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         { 
-          text: t.delete, 
+          text: 'Delete', 
           style: 'destructive',
           onPress: async () => {
             // Since we can't delete auth.users from client without service_role,
@@ -227,29 +181,29 @@ export default function PrivacySecurityScreen() {
 
   return (
     <PaperProvider>
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.cardBorder }]}>
           <TouchableOpacity 
-            style={styles.backBtn}
+            style={[styles.backBtn, { backgroundColor: theme.badgeBackground, borderColor: theme.badgeBorder }]}
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color="#3A5C18" />
+            <Ionicons name="arrow-back" size={24} color="#7EB93C" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t.privacySecurity}</Text>
+          <Text style={[styles.headerTitle, { color: theme.textBrand }]}>Privacy & Security</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Password Section */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>{t.changePassword}</Text>
+          <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>Change Password</Text>
             
             <TextInput
               mode="outlined"
-              label={t.currentPass}
+              label="Current Password"
               value={currentPassword}
               onChangeText={(text) => {
                 setCurrentPassword(text);
@@ -257,10 +211,11 @@ export default function PrivacySecurityScreen() {
               }}
               secureTextEntry
               activeOutlineColor={currentPasswordError ? "#FF4D4F" : "#7EB93C"}
-              outlineColor={currentPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              outlineColor={currentPasswordError ? "#FF4D4F" : theme.inputOutline}
               error={!!currentPasswordError}
               style={styles.input}
-              textColor="#1A2310"
+              textColor={theme.inputText}
+              theme={{ colors: { background: theme.inputBackground } }}
             />
             {!!currentPasswordError && (
               <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
@@ -270,7 +225,7 @@ export default function PrivacySecurityScreen() {
 
             <TextInput
               mode="outlined"
-              label={t.newPass}
+              label="New Password"
               value={newPassword}
               onChangeText={(text) => {
                 setNewPassword(text);
@@ -278,10 +233,11 @@ export default function PrivacySecurityScreen() {
               }}
               secureTextEntry
               activeOutlineColor={newPasswordError ? "#FF4D4F" : "#7EB93C"}
-              outlineColor={newPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              outlineColor={newPasswordError ? "#FF4D4F" : theme.inputOutline}
               error={!!newPasswordError}
               style={styles.input}
-              textColor="#1A2310"
+              textColor={theme.inputText}
+              theme={{ colors: { background: theme.inputBackground } }}
             />
             {!!newPasswordError && (
               <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
@@ -291,7 +247,7 @@ export default function PrivacySecurityScreen() {
 
             <TextInput
               mode="outlined"
-              label={t.confirmPass}
+              label="Confirm New Password"
               value={confirmPassword}
               onChangeText={(text) => {
                 setConfirmPassword(text);
@@ -299,10 +255,11 @@ export default function PrivacySecurityScreen() {
               }}
               secureTextEntry
               activeOutlineColor={confirmPasswordError ? "#FF4D4F" : "#7EB93C"}
-              outlineColor={confirmPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              outlineColor={confirmPasswordError ? "#FF4D4F" : theme.inputOutline}
               error={!!confirmPasswordError}
               style={styles.input}
-              textColor="#1A2310"
+              textColor={theme.inputText}
+              theme={{ colors: { background: theme.inputBackground } }}
             />
             {!!confirmPasswordError && (
               <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
@@ -319,16 +276,16 @@ export default function PrivacySecurityScreen() {
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.updateBtnText}>{t.updatePass}</Text>
+                <Text style={styles.updateBtnText}>Update Password</Text>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Danger Zone */}
-          <View style={[styles.card, styles.dangerCard]}>
-            <Text style={[styles.sectionTitle, { color: '#FF4D4F' }]}>{t.dangerZone}</Text>
-            <Text style={styles.dangerDesc}>
-              {t.dangerDesc}
+          <View style={[styles.card, { backgroundColor: theme.dangerCardBg, borderColor: theme.dangerCardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: '#FF4D4F' }]}>Danger Zone</Text>
+            <Text style={[styles.dangerDesc, { color: theme.textMuted }]}>
+              Once you delete your account, all calorie logs, weight history, and data will be permanently wiped out.
             </Text>
 
             <TouchableOpacity 
@@ -337,7 +294,7 @@ export default function PrivacySecurityScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="trash-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.deleteBtnText}>{t.deleteAcc}</Text>
+              <Text style={styles.deleteBtnText}>Delete Account</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -369,8 +326,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1.5,
-    borderBottomColor: '#EBF2E5',
-    backgroundColor: '#FFFFFF',
   },
   backBtn: {
     width: 40,
@@ -410,7 +365,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   input: {
-    backgroundColor: '#FFFFFF',
     marginBottom: 12,
   },
   updateBtn: {

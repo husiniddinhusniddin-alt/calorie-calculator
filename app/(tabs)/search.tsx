@@ -25,7 +25,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LocaleConfig } from 'react-native-calendars';
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -93,16 +93,35 @@ const translations = {
   },
 };
 
+// ─── Date Translations ───────────────────────────────────────────────────────
+const dayNamesShort: any = {
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  ru: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+  uz: ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan'],
+};
+
+const dayNames: any = {
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  ru: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
+  uz: ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'],
+};
+
+const monthNamesShort: any = {
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  ru: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
+  uz: ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'],
+};
+
 // ─── Week Days ────────────────────────────────────────────────────────────────
 const getWeekDays = (language: string) => {
-  const locData = LocaleConfig.locales[language] || LocaleConfig.locales['en'];
+  const shortDays = dayNamesShort[language] || dayNamesShort['en'];
   const today = new Date();
   const days = [];
   for (let i = -2; i <= 2; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     days.push({
-      day: locData.dayNamesShort[d.getDay()],
+      day: shortDays[d.getDay()],
       date: d.getDate(),
       isToday: i === 0,
     });
@@ -654,8 +673,9 @@ export default function PedometerScreen() {
             <View>
               <Text style={[styles.headerDate, { color: theme.textMuted }]}>
                 {(() => {
-                  const locData = LocaleConfig.locales[language] || LocaleConfig.locales['en'];
-                  return `${locData.dayNames[selectedDateObj.getDay()]}, ${selectedDateObj.getDate()} ${locData.monthNamesShort[selectedDateObj.getMonth()]}, ${selectedDateObj.getFullYear()}`;
+                  const dNames = dayNames[language] || dayNames['en'];
+                  const mNames = monthNamesShort[language] || monthNamesShort['en'];
+                  return `${dNames[selectedDateObj.getDay()]}, ${selectedDateObj.getDate()} ${mNames[selectedDateObj.getMonth()]}, ${selectedDateObj.getFullYear()}`;
                 })()}
               </Text>
               <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{t.dailyActivity}</Text>

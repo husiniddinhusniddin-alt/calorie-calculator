@@ -1,13 +1,12 @@
 import { MockStore } from '@/constants/store';
-import { supabase } from '@/constants/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -43,6 +42,8 @@ const translations = {
   }
 };
 
+import { supabase } from '@/constants/supabase';
+
 export default function ProfileScreen() {
   const router = useRouter();
 
@@ -67,6 +68,8 @@ export default function ProfileScreen() {
     badgeBorder: isDark ? '#374B2A' : '#C8E8A0',
     streakBoxBg: isDark ? '#10160B' : '#F5F5F5',
     menuIconBg: isDark ? '#23321A' : '#F0FAE4',
+    logoutBtnBg: isDark ? '#2A1A1A' : '#FFF2F2',
+    logoutBtnBorder: isDark ? '#4A2A2A' : '#FFE0E0',
   };
 
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
@@ -76,8 +79,6 @@ export default function ProfileScreen() {
   const [height, setHeight] = useState<number | null>(MockStore.height);
   const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>(MockStore.weightUnit);
-  const [heightUnit, setHeightUnit] = useState<'cm' | 'inches'>(MockStore.heightUnit);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -90,9 +91,6 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      // Sync latest avatar from MockStore whenever the tab is focused
-      setProfileImage(MockStore.profileImage);
-
       const loadStats = async () => {
         setIsLoadingStats(true);
         const { data: userData } = await supabase.auth.getUser();
@@ -162,21 +160,10 @@ export default function ProfileScreen() {
         .maybeSingle();
 
       if (data) {
-        // Convert stored storage path → permanent public URL (public bucket)
-        const rawPath = data.profile_image;
-        let displayImage: string | null = MockStore.profileImage;
-        if (rawPath) {
-          if (rawPath.startsWith('http')) {
-            displayImage = rawPath; // already a full URL (legacy)
-          } else {
-            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(rawPath);
-            displayImage = urlData.publicUrl;
-          }
-        }
         MockStore.update({
           name: data.name || MockStore.name,
           email: data.email || MockStore.email,
-          profileImage: displayImage,
+          profileImage: data.profile_image || MockStore.profileImage,
           targetWeight: data.target_weight || MockStore.targetWeight,
           currentWeight: data.current_weight || MockStore.currentWeight,
           age: data.age || MockStore.age,
@@ -198,8 +185,6 @@ export default function ProfileScreen() {
       setHeight(MockStore.height);
       setCalorieStreak(MockStore.calorieStreak);
       setWaterStreak(MockStore.waterStreak);
-      setWeightUnit(MockStore.weightUnit);
-      setHeightUnit(MockStore.heightUnit);
     });
   }, []);
 
@@ -236,7 +221,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // Profile Image Picker — uploads to Supabase Storage, saves path, displays public URL
+  // Profile Image Picker
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -252,42 +237,19 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled && result.assets && result.assets[0].uri) {
-      const localUri = result.assets[0].uri;
+      const selectedUri = result.assets[0].uri;
+      MockStore.update({ profileImage: selectedUri });
 
+      // Update image url in Supabase profiles table
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Unique storage path: userId/timestamp.ext
-        const ext = localUri.split('.').pop()?.split('?')[0] || 'jpg';
-        const storagePath = `${user.id}/${Date.now()}.${ext}`;
-        const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-
-        // Fetch local file as Blob and upload
-        const response = await fetch(localUri);
-        const blob = await response.blob();
-
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(storagePath, blob, { contentType, upsert: true });
-
-        if (uploadError) {
-          console.warn('Avatar upload error:', uploadError.message);
-          alert('Failed to upload image: ' + uploadError.message);
-          return;
+        if (user) {
+          await supabase.from('profiles').update({
+            profile_image: selectedUri,
+          }).eq('id', user.id);
         }
-
-        // Get permanent public URL (public bucket)
-        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(storagePath);
-        const publicUrl = urlData.publicUrl;
-
-        // Save path to DB, update MockStore with public URL
-        await supabase.from('profiles').update({ profile_image: storagePath }).eq('id', user.id);
-        MockStore.update({ profileImage: publicUrl });
-
       } catch (err) {
-        console.warn('Failed to upload avatar:', err);
-        alert('Image upload failed. Please try again.');
+        console.warn('Failed to update avatar in DB:', err);
       }
     }
   };
@@ -339,12 +301,12 @@ export default function ProfileScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{currentWeight} {weightUnit}</Text>
+              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{currentWeight} kg</Text>
               <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.weight}</Text>
             </View>
             <View style={[styles.statDividerVertical, { backgroundColor: theme.cardBorder }]} />
             <View style={styles.statBox}>
-              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{height ? `${height} ${heightUnit === 'inches' ? 'in' : heightUnit}` : '--'}</Text>
+              <Text style={[styles.statVal, { color: theme.textPrimary }]}>{height ? `${height} cm` : '--'}</Text>
               <Text style={[styles.statLbl, { color: theme.textMuted }]}>{t.height}</Text>
             </View>
             <View style={[styles.statDividerVertical, { backgroundColor: theme.cardBorder }]} />
@@ -440,7 +402,7 @@ export default function ProfileScreen() {
         {/* Logout Button */}
         <Animated.View entering={FadeInDown.duration(500).delay(400)}>
           <TouchableOpacity
-            style={styles.logoutBtn}
+            style={[styles.logoutBtn, { backgroundColor: theme.logoutBtnBg, borderColor: theme.logoutBtnBorder }]}
             activeOpacity={0.8}
             onPress={handleLogout}
           >
@@ -461,7 +423,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-            <View style={[styles.modalIconContainer, { backgroundColor: '#FFF2F2' }]}>
+            <View style={[styles.modalIconContainer, { backgroundColor: theme.logoutBtnBg }]}>
               <Ionicons name="log-out-outline" size={28} color="#FF4D4F" />
             </View>
             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{t.confirmLogout}</Text>

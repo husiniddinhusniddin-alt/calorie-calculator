@@ -22,31 +22,7 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Calendar, LocaleConfig } from 'react-native-calendars';
-
-LocaleConfig.locales['ru'] = {
-  monthNames: ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'],
-  monthNamesShort: ['Янв.','Фев.','Март','Апр.','Май','Июнь','Июль','Авг.','Сент.','Окт.','Нояб.','Дек.'],
-  dayNames: ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'],
-  dayNamesShort: ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'],
-  today: 'Сегодня'
-};
-
-LocaleConfig.locales['uz'] = {
-  monthNames: ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'],
-  monthNamesShort: ['Yan','Fev','Mar','Apr','May','Iyun','Iyul','Avg','Sen','Okt','Noy','Dek'],
-  dayNames: ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'],
-  dayNamesShort: ['Yak','Dush','Sesh','Chor','Pay','Jum','Shan'],
-  today: 'Bugun'
-};
-
-LocaleConfig.locales['en'] = {
-  monthNames: ['January','February','March','April','May','June','July','August','September','October','November','December'],
-  monthNamesShort: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-  dayNames: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
-  dayNamesShort: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
-  today: 'Today'
-};
+import { Calendar } from 'react-native-calendars';
 import Animated, { Easing, FadeInDown, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -84,12 +60,17 @@ const translations = {
     save: 'Save',
     oatmealText: 'Oatmeal with fruits and nuts',
     chopsText: 'Chops with potatoes',
-    editGoalDesc: 'Edit total calories or specific macros. Calories will recalculate automatically.',
-    calories: 'Calories',
-    carbsG: 'Carbs (g)',
-    proteinG: 'Protein (g)',
-    fatG: 'Fat (g)',
-    weekShort: 'W',
+    alignFood: 'Align food in frame',
+    analyzingImage: 'Analyzing image...',
+    mealTypeLabel: 'Meal Type',
+    selectBelow: 'Select below',
+    serving: 'Serving',
+    ingredients: 'Ingredients',
+    addToDiary: 'Add to Diary',
+    errorIdentifyFood: 'We couldn\'t identify any food.',
+    errorIdentifyFoodDesc: 'Please make sure the dish is clearly visible and the photo is of good quality.',
+    tryAgain: 'Try Again',
+    backToHome: 'Back to Home',
   },
   ru: {
     monday: 'Понедельник',
@@ -123,12 +104,17 @@ const translations = {
     save: 'Сохранить',
     oatmealText: 'Овсянка с фруктами и орехами',
     chopsText: 'Отбивные с картофелем',
-    editGoalDesc: 'Измените общие калории или макросы. Калории пересчитаются автоматически.',
-    calories: 'Калории',
-    carbsG: 'Углеводы (г)',
-    proteinG: 'Белки (г)',
-    fatG: 'Жиры (г)',
-    weekShort: 'Н',
+    alignFood: 'Поместите еду в кадр',
+    analyzingImage: 'Анализ изображения...',
+    mealTypeLabel: 'Прием пищи',
+    selectBelow: 'Выберите ниже',
+    serving: 'Порция',
+    ingredients: 'Ингредиенты',
+    addToDiary: 'Добавить в дневник',
+    errorIdentifyFood: 'Мы не смогли определить еду.',
+    errorIdentifyFoodDesc: 'Пожалуйста, убедитесь, что блюдо хорошо видно и фото хорошего качества.',
+    tryAgain: 'Попробовать снова',
+    backToHome: 'На главную',
   },
   uz: {
     monday: 'Dushanba',
@@ -162,12 +148,17 @@ const translations = {
     save: 'Saqlash',
     oatmealText: 'Mevalar va yong\'oqlar bilan suli bo\'tqasi',
     chopsText: 'Kartoshka bilan otbivnoy',
-    editGoalDesc: 'Umumiy kaloriya yoki makrolarni tahrirlang. Kaloriyalar avtomatik qayta hisoblanadi.',
-    calories: 'Kaloriya',
-    carbsG: 'Uglevodlar (g)',
-    proteinG: 'Oqsillar (g)',
-    fatG: 'Yog\'lar (g)',
-    weekShort: 'H',
+    alignFood: 'Taomni ramkaga joylashtiring',
+    analyzingImage: 'Rasm tahlil qilinmoqda...',
+    mealTypeLabel: 'Taom turi',
+    selectBelow: 'Quyidan tanlang',
+    serving: 'Portsiya',
+    ingredients: 'Tarkibi',
+    addToDiary: 'Kundalikka qo\'shish',
+    errorIdentifyFood: 'Biz hech qanday taomni aniqlay olmadik.',
+    errorIdentifyFoodDesc: 'Iltimos, taom aniq ko\'rinayotganiga va rasm sifati yaxshi ekanligiga ishonch hosil qiling.',
+    tryAgain: 'Qayta urinish',
+    backToHome: 'Bosh sahifaga qaytish',
   }
 };
 
@@ -358,7 +349,7 @@ const SkeletonItem = ({ style, isDark }: { style: any, isDark: boolean }) => {
   return <Animated.View style={[style, animatedStyle, { backgroundColor: isDark ? '#333' : '#E2E8F0' }]} />;
 };
 
-const analyzeFoodWithAI = async (base64Image: string) => {
+const analyzeFoodWithAI = async (base64Image: string, languageCode: string) => {
   const { data: secretData, error: secretError } = await supabase
     .from('secrets')
     .select('value')
@@ -392,7 +383,8 @@ const analyzeFoodWithAI = async (base64Image: string) => {
                     "5. Never hallucinate food that is clearly absent.\n" +
                     "6. If multiple foods are present, identify each separately, estimate for each, and sum them in the total.\n" +
                     "7. If confidence is low, state that the estimate is approximate (e.g. in the subtitle) rather than refusing to analyze.\n" +
-                    "8. IMPORTANT: Estimate the approximate weight (in grams) of the food portion shown in the image. Base ALL your calorie and macronutrient calculations strictly on this estimated weight. Include this total estimated weight clearly in the 'subtitle' field.\n\n" +
+                    "8. IMPORTANT: Estimate the approximate weight (in grams) of the food portion shown in the image. Base ALL your calorie and macronutrient calculations strictly on this estimated weight. Include this total estimated weight clearly in the 'subtitle' field.\n" +
+                    "9. IMPORTANT: The user has selected the language code '" + languageCode + "'. You MUST translate the 'title', 'subtitle', and ingredient 'name' values into this language (e.g. if 'uz', use Uzbek; if 'ru', use Russian; if 'en', use English). Do NOT translate the JSON keys, only the values.\n\n" +
                     "Output Format:\n" +
                     "You must return ONLY a JSON object in this format (no markdown formatting):\n" +
                     "If Food Detected is Yes:\n" +
@@ -471,8 +463,6 @@ export default function DiaryScreen() {
     mealBorder: isDark ? '#2A3A1E' : '#EBF2E5',
     mealEmptyText: isDark ? '#5A684E' : '#BBBBBB',
   };
-
-  LocaleConfig.defaultLocale = language;
 
   const [meals, setMeals] = useState<any[]>([
     { id: 'breakfast', label: 'Breakfast', color: '#F4C344', calories: 0, items: [], empty: true },
@@ -583,9 +573,9 @@ export default function DiaryScreen() {
   }, [userId, selectedDate]);
 
   const dateObj = new Date(selectedDate);
-  const locData = LocaleConfig.locales[language] || LocaleConfig.locales['en'];
-  const formattedDayName = locData.dayNames[dateObj.getDay()];
-  const formattedDate = `${dateObj.getDate()} ${locData.monthNamesShort[dateObj.getMonth()]}, ${dateObj.getFullYear()}`;
+  const locale = language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-US';
+  const formattedDayName = dateObj.toLocaleDateString(locale, { weekday: 'long' });
+  const formattedDate = dateObj.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
 
   const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('day');
   const [isFetching, setIsFetching] = useState(true);
@@ -610,6 +600,7 @@ export default function DiaryScreen() {
   const [scannerStep, setScannerStep] = useState<'camera' | 'processing' | 'error'>('camera');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scannedResult, setScannedResult] = useState<any>(null);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
   // Real trend chart data from Supabase
@@ -652,23 +643,18 @@ export default function DiaryScreen() {
           .gte('date', startDateStr)
           .lte('date', endDateStr);
 
-        const last7Days = Array.from({ length: 7 }).map((_, i) => {
-           const d = new Date(today);
-           d.setDate(today.getDate() - (6 - i));
-           return d.toISOString().split('T')[0];
-        });
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          const dateStr = d.toISOString().split('T')[0];
+          const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().slice(0, 3);
 
-        last7Days.forEach((dateStr) => {
-          const d = new Date(dateStr);
-          const locData = LocaleConfig.locales[language] || LocaleConfig.locales['en'];
-          const dayLabel = locData.dayNamesShort[d.getDay()].toUpperCase();
-          
           const total = (data || [])
             .filter((r: any) => r.date === dateStr)
             .reduce((s: number, r: any) => s + (r.calories || 0), 0);
 
           rows.push({ label: dayLabel, value: total });
-        });
+        }
         maxVal = Math.max(2000, ...rows.map(r => r.value));
 
       } else {
@@ -700,7 +686,7 @@ export default function DiaryScreen() {
             .filter((r: any) => r.date >= s && r.date <= e)
             .reduce((s2: number, r: any) => s2 + (r.calories || 0), 0);
 
-          rows.push({ label: `${t.weekShort}${4 - i}`, value: total });
+          rows.push({ label: `W${4 - i}`, value: total });
         }
         maxVal = Math.max(2000, ...rows.map(r => r.value));
       }
@@ -718,7 +704,7 @@ export default function DiaryScreen() {
 
   const animatedTabIndicatorStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateX: withTiming(activeTabIndex * 60, { duration: 400, easing: Easing.out(Easing.exp) }) }]
+      transform: [{ translateX: withTiming(activeTabIndex * 80, { duration: 400, easing: Easing.out(Easing.exp) }) }]
     };
   });
 
@@ -951,7 +937,7 @@ export default function DiaryScreen() {
                     top: 4,
                     bottom: 4,
                     left: 4,
-                    width: 60,
+                    width: 80,
                     backgroundColor: '#7EB93C',
                     borderRadius: 6,
                   }, animatedTabIndicatorStyle]} />
@@ -959,7 +945,7 @@ export default function DiaryScreen() {
                   {trendTabsList.map((tab) => (
                     <TouchableOpacity
                       key={tab}
-                      style={[styles.chartTab, { width: 60, alignItems: 'center', backgroundColor: 'transparent' }]}
+                      style={[styles.chartTab, { width: 80, alignItems: 'center', backgroundColor: 'transparent', paddingHorizontal: 0 }]}
                       onPress={() => setActiveTrendTab(tab as any)}
                     >
                       <Text style={[styles.chartTabText, activeTrendTab === tab ? styles.chartTabTextActive : { color: theme.textMuted }]}>
@@ -1098,11 +1084,11 @@ export default function DiaryScreen() {
               <View style={[styles.modalCard, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, borderWidth: 1.5, width: '85%' }]}>
                 <Text style={[styles.modalTitle, { color: theme.textPrimary, marginBottom: 8 }]}>{t.updateDailyGoal}</Text>
                 <Text style={{ fontSize: 13, color: theme.textMuted, marginBottom: 20, textAlign: 'center' }}>
-                  {t.editGoalDesc}
+                  Edit total calories or specific macros. Calories will recalculate automatically.
                 </Text>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
-                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>{t.calories}</Text>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Calories</Text>
                   <TextInput
                     style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
                     keyboardType="numeric"
@@ -1120,7 +1106,7 @@ export default function DiaryScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
-                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>{t.carbsG}</Text>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Carbs (g)</Text>
                   <TextInput
                     style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
                     keyboardType="numeric"
@@ -1136,7 +1122,7 @@ export default function DiaryScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 12 }}>
-                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>{t.proteinG}</Text>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Protein (g)</Text>
                   <TextInput
                     style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
                     keyboardType="numeric"
@@ -1151,8 +1137,8 @@ export default function DiaryScreen() {
                   />
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 24 }}>
-                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>{t.fatG}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%', marginBottom: 20 }}>
+                  <Text style={{ width: 90, color: theme.textSecondary, fontWeight: '600' }}>Fat (g)</Text>
                   <TextInput
                     style={[styles.modalInput, { flex: 1, marginBottom: 0, backgroundColor: theme.pillBackground, color: theme.textPrimary }]}
                     keyboardType="numeric"
@@ -1221,42 +1207,49 @@ export default function DiaryScreen() {
                   <View style={[styles.corner, styles.bottomRight]} />
                   <Animated.View style={[styles.scanLine, scanLineStyle]} />
                 </View>
-                <Text style={styles.scanText}>Align food in frame</Text>
+                <Text style={styles.scanText}>{t.alignFood}</Text>
 
                 <View style={styles.cameraActions}>
-                  <TouchableOpacity style={styles.closeCameraBtn} onPress={() => setIsScanning(false)}>
-                    <Ionicons name="close" size={30} color="#FFF" />
+                  <TouchableOpacity style={styles.closeCameraBtn} disabled={isTakingPhoto} onPress={() => setIsScanning(false)}>
+                    <Ionicons name="close" size={30} color={isTakingPhoto ? "#888" : "#FFF"} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.captureBtn} onPress={async () => {
-                    if (cameraRef.current) {
-                      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5, exif: true });
-                      if (photo?.uri && photo.base64) {
-                        const placeholderResult = {
-                          ...MOCK_SCANNED_RESULT,
-                          image: photo.uri
-                        };
-                        setScannedResult(placeholderResult);
-                        setScannerStep('processing');
-                        resultTransition.value = 0;
+                  <TouchableOpacity style={styles.captureBtn} disabled={isTakingPhoto} onPress={async () => {
+                    if (cameraRef.current && !isTakingPhoto) {
+                      setIsTakingPhoto(true);
+                      try {
+                        const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5, exif: true });
+                        if (photo?.uri && photo.base64) {
+                          const placeholderResult = {
+                            ...MOCK_SCANNED_RESULT,
+                            image: photo.uri
+                          };
+                          setScannedResult(placeholderResult);
+                          setScannerStep('processing');
+                          resultTransition.value = 0;
 
-                        try {
-                          const aiResult = await analyzeFoodWithAI(photo.base64);
-                          if (aiResult.error === 'not_food') {
-                            setScannerStep('error');
-                          } else {
-                            const dynamicResult = {
-                              ...aiResult,
-                              image: photo.uri
-                            };
-                            setScannedResult(dynamicResult);
-                            resultTransition.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) });
+                          try {
+                            const aiResult = await analyzeFoodWithAI(photo.base64, language);
+                            if (aiResult.error === 'not_food') {
+                              setScannerStep('error');
+                            } else {
+                              const dynamicResult = {
+                                ...aiResult,
+                                image: photo.uri
+                              };
+                              setScannedResult(dynamicResult);
+                              resultTransition.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.exp) });
+                            }
+                          } catch (e) {
+                            console.log("Error analyzing food:", e);
+                            Alert.alert("Error", "Could not analyze the image. Please try again.");
+                            setIsScanning(false);
+                            setScannerStep('camera');
                           }
-                        } catch (e) {
-                          console.log("Error analyzing food:", e);
-                          Alert.alert("Error", "Could not analyze the image. Please try again.");
-                          setIsScanning(false);
-                          setScannerStep('camera');
                         }
+                      } catch (e) {
+                        console.log("Camera capture error:", e);
+                      } finally {
+                        setIsTakingPhoto(false);
                       }
                     }
                   }}>
@@ -1285,8 +1278,8 @@ export default function DiaryScreen() {
 
                 {/* Meal type overlay fades in */}
                 <Animated.View style={[styles.mealTypeOverlay, animatedDetailsOpacityStyle]}>
-                  <Text style={styles.mealTypeLabel}>Meal Type</Text>
-                  <Text style={styles.mealTypeValue}>{selectedMealType ? selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1) : 'Select below'}</Text>
+                  <Text style={styles.mealTypeLabel}>{t.mealTypeLabel}</Text>
+                  <Text style={styles.mealTypeValue}>{selectedMealType ? t[selectedMealType as keyof typeof t] || (selectedMealType.charAt(0).toUpperCase() + selectedMealType.slice(1)) : t.selectBelow}</Text>
                 </Animated.View>
 
                 {/* Scanning overlay fades out */}
@@ -1298,7 +1291,7 @@ export default function DiaryScreen() {
                     <View style={[styles.corner, styles.bottomRight]} />
                     <Animated.View style={[styles.scanLine, scanLineStyle]} />
                   </View>
-                  <Text style={styles.scanText}>Analyzing image...</Text>
+                  <Text style={styles.scanText}>{t.analyzingImage}</Text>
                 </Animated.View>
               </Animated.View>
 
@@ -1309,7 +1302,7 @@ export default function DiaryScreen() {
                   <Text style={styles.resultSubtitle}>{scannedResult.subtitle}</Text>
 
                   <View style={styles.servingRow}>
-                    <Text style={styles.servingText}><Text style={{ fontWeight: '800' }}>{scannedResult.serving}</Text> Serving</Text>
+                    <Text style={styles.servingText}><Text style={{ fontWeight: '800' }}>{scannedResult.serving}</Text> {t.serving}</Text>
                     <Text style={styles.caloriesText}><Text style={{ color: '#C93A3E' }}>{scannedResult.calories}</Text> Kcal</Text>
                   </View>
 
@@ -1317,21 +1310,21 @@ export default function DiaryScreen() {
                     <View style={styles.resultMacroCard}>
                       <View style={styles.resultMacroIconBg}><Text style={{ fontSize: 20 }}>🍚</Text></View>
                       <Text style={styles.resultMacroVal}>{scannedResult.macros.carbs}<Text style={styles.resultMacroUnit}>gr</Text></Text>
-                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Carbs</Text></View>
+                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>{t.carbs}</Text></View>
                     </View>
                     <View style={styles.resultMacroCard}>
                       <View style={styles.resultMacroIconBg}><Text style={{ fontSize: 20 }}>🍗</Text></View>
                       <Text style={styles.resultMacroVal}>{scannedResult.macros.protein}<Text style={styles.resultMacroUnit}>gr</Text></Text>
-                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Protein</Text></View>
+                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>{t.protein}</Text></View>
                     </View>
                     <View style={styles.resultMacroCard}>
                       <View style={styles.resultMacroIconBg}><Text style={{ fontSize: 20 }}>💧</Text></View>
                       <Text style={styles.resultMacroVal}>{scannedResult.macros.fat}<Text style={styles.resultMacroUnit}>gr</Text></Text>
-                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>Fat</Text></View>
+                      <View style={styles.resultMacroPill}><Text style={styles.resultMacroPillText}>{t.fat}</Text></View>
                     </View>
                   </View>
 
-                  <Text style={styles.ingredientsTitle}>Ingredients</Text>
+                  <Text style={styles.ingredientsTitle}>{t.ingredients}</Text>
                   <View style={styles.ingredientsList}>
                     {scannedResult.ingredients.map((ing: any, idx: number) => (
                       <View key={idx} style={styles.ingredientRow}>
@@ -1367,7 +1360,7 @@ export default function DiaryScreen() {
                           styles.mealTypeChipText,
                           selectedMealType === type && styles.mealTypeChipTextSelected
                         ]}>
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                          {t[type as keyof typeof t] || (type.charAt(0).toUpperCase() + type.slice(1))}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -1458,7 +1451,7 @@ export default function DiaryScreen() {
                       }
                     }}
                   >
-                    <Text style={styles.resultAddBtnText}>Add to Diary</Text>
+                    <Text style={styles.resultAddBtnText}>{t.addToDiary}</Text>
                   </TouchableOpacity>
                 </View>
               </Animated.View>
@@ -1468,8 +1461,8 @@ export default function DiaryScreen() {
           {scannerStep === 'error' && (
             <View style={[styles.resultContainer, { justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#111' }]}>
               <Ionicons name="warning-outline" size={80} color="#FFD700" style={{ marginBottom: 24 }} />
-              <Text style={{ fontSize: 24, fontWeight: '700', color: '#FFF', textAlign: 'center', marginBottom: 12 }}>We couldn&apos;t identify any food.</Text>
-              <Text style={{ fontSize: 16, color: '#AAA', textAlign: 'center', marginBottom: 40 }}>Please make sure the dish is clearly visible and the photo is of good quality.</Text>
+              <Text style={{ fontSize: 24, fontWeight: '700', color: '#FFF', textAlign: 'center', marginBottom: 12 }}>{t.errorIdentifyFood}</Text>
+              <Text style={{ fontSize: 16, color: '#AAA', textAlign: 'center', marginBottom: 40 }}>{t.errorIdentifyFoodDesc}</Text>
               <View style={{ width: '100%', gap: 16, paddingHorizontal: 20 }}>
                 <TouchableOpacity
                   style={{ backgroundColor: '#7EB93C', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }}
@@ -1478,7 +1471,7 @@ export default function DiaryScreen() {
                     setScannerStep('camera');
                   }}
                 >
-                  <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '600' }}>Try Again</Text>
+                  <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '600' }}>{t.tryAgain}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={{ backgroundColor: '#333', paddingVertical: 16, borderRadius: 16, alignItems: 'center' }}
@@ -1487,7 +1480,7 @@ export default function DiaryScreen() {
                     setScannerStep('camera');
                   }}
                 >
-                  <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '600' }}>Back to Home</Text>
+                  <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '600' }}>{t.backToHome}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1835,17 +1828,15 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     marginBottom: 24,
   },
   chartTitle: {
-    flexShrink: 1,
-    marginRight: 8,
     fontSize: 16,
     fontWeight: '800',
     color: '#1A1A1A',
+    marginBottom: 16,
   },
   chartTabs: {
     flexDirection: 'row',
