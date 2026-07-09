@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  useColorScheme,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,12 +16,34 @@ import { Provider as PaperProvider, TextInput, Snackbar, Portal } from 'react-na
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/constants/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MockStore } from '@/constants/store';
 
 export default function PrivacySecurityScreen() {
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const colorScheme = useColorScheme();
+  const appTheme = MockStore.appTheme;
+  const isDark = appTheme === 'system' ? colorScheme === 'dark' : appTheme === 'dark';
+
+  // Theme Colors
+  const theme = {
+    background: isDark ? '#0F140A' : '#F7FAF3',
+    cardBackground: isDark ? '#171E10' : '#FFFFFF',
+    cardBorder: isDark ? '#2A3A1E' : '#EBF2E5',
+    textPrimary: isDark ? '#FAFCF8' : '#1A2310',
+    textBrand: isDark ? '#8CC33F' : '#3A5C18',
+    textMuted: isDark ? '#9AA88E' : '#6B785E',
+    badgeBackground: isDark ? '#23321A' : '#FAFCF8',
+    badgeBorder: isDark ? '#374B2A' : '#EBF2E5',
+    inputText: isDark ? '#FAFCF8' : '#1A2310',
+    inputBackground: isDark ? '#171E10' : '#FFFFFF',
+    inputOutline: isDark ? '#2A3A1E' : '#EBF2E5',
+    dangerCardBg: isDark ? '#2A1010' : '#FFFBFB',
+    dangerCardBorder: isDark ? '#4A1C1C' : '#FFE0E0',
+  };
 
   const [isLoading, setIsLoading] = useState(false);
   const [currentPasswordError, setCurrentPasswordError] = useState('');
@@ -158,25 +181,25 @@ export default function PrivacySecurityScreen() {
 
   return (
     <PaperProvider>
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.cardBorder }]}>
           <TouchableOpacity 
-            style={styles.backBtn}
+            style={[styles.backBtn, { backgroundColor: theme.badgeBackground, borderColor: theme.badgeBorder }]}
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color="#3A5C18" />
+            <Ionicons name="arrow-back" size={24} color="#7EB93C" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Privacy & Security</Text>
+          <Text style={[styles.headerTitle, { color: theme.textBrand }]}>Privacy & Security</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Password Section */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Change Password</Text>
+          <View style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
+            <Text style={[styles.sectionTitle, { color: theme.textBrand }]}>Change Password</Text>
             
             <TextInput
               mode="outlined"
@@ -188,10 +211,11 @@ export default function PrivacySecurityScreen() {
               }}
               secureTextEntry
               activeOutlineColor={currentPasswordError ? "#FF4D4F" : "#7EB93C"}
-              outlineColor={currentPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              outlineColor={currentPasswordError ? "#FF4D4F" : theme.inputOutline}
               error={!!currentPasswordError}
               style={styles.input}
-              textColor="#1A2310"
+              textColor={theme.inputText}
+              theme={{ colors: { background: theme.inputBackground } }}
             />
             {!!currentPasswordError && (
               <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
@@ -209,10 +233,11 @@ export default function PrivacySecurityScreen() {
               }}
               secureTextEntry
               activeOutlineColor={newPasswordError ? "#FF4D4F" : "#7EB93C"}
-              outlineColor={newPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              outlineColor={newPasswordError ? "#FF4D4F" : theme.inputOutline}
               error={!!newPasswordError}
               style={styles.input}
-              textColor="#1A2310"
+              textColor={theme.inputText}
+              theme={{ colors: { background: theme.inputBackground } }}
             />
             {!!newPasswordError && (
               <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
@@ -230,10 +255,11 @@ export default function PrivacySecurityScreen() {
               }}
               secureTextEntry
               activeOutlineColor={confirmPasswordError ? "#FF4D4F" : "#7EB93C"}
-              outlineColor={confirmPasswordError ? "#FF4D4F" : "#EBF2E5"}
+              outlineColor={confirmPasswordError ? "#FF4D4F" : theme.inputOutline}
               error={!!confirmPasswordError}
               style={styles.input}
-              textColor="#1A2310"
+              textColor={theme.inputText}
+              theme={{ colors: { background: theme.inputBackground } }}
             />
             {!!confirmPasswordError && (
               <Text style={{ color: '#FF4D4F', fontSize: 12, marginTop: -8, marginBottom: 12, marginLeft: 4 }}>
@@ -256,9 +282,9 @@ export default function PrivacySecurityScreen() {
           </View>
 
           {/* Danger Zone */}
-          <View style={[styles.card, styles.dangerCard]}>
+          <View style={[styles.card, { backgroundColor: theme.dangerCardBg, borderColor: theme.dangerCardBorder }]}>
             <Text style={[styles.sectionTitle, { color: '#FF4D4F' }]}>Danger Zone</Text>
-            <Text style={styles.dangerDesc}>
+            <Text style={[styles.dangerDesc, { color: theme.textMuted }]}>
               Once you delete your account, all calorie logs, weight history, and data will be permanently wiped out.
             </Text>
 
@@ -300,8 +326,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1.5,
-    borderBottomColor: '#EBF2E5',
-    backgroundColor: '#FFFFFF',
   },
   backBtn: {
     width: 40,
@@ -341,7 +365,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   input: {
-    backgroundColor: '#FFFFFF',
     marginBottom: 12,
   },
   updateBtn: {

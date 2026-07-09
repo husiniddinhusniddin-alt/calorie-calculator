@@ -68,6 +68,8 @@ export default function ProfileScreen() {
     badgeBorder: isDark ? '#374B2A' : '#C8E8A0',
     streakBoxBg: isDark ? '#10160B' : '#F5F5F5',
     menuIconBg: isDark ? '#23321A' : '#F0FAE4',
+    logoutBtnBg: isDark ? '#2A1A1A' : '#FFF2F2',
+    logoutBtnBorder: isDark ? '#4A2A2A' : '#FFE0E0',
   };
 
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
@@ -400,7 +402,7 @@ export default function ProfileScreen() {
         {/* Logout Button */}
         <Animated.View entering={FadeInDown.duration(500).delay(400)}>
           <TouchableOpacity
-            style={styles.logoutBtn}
+            style={[styles.logoutBtn, { backgroundColor: theme.logoutBtnBg, borderColor: theme.logoutBtnBorder }]}
             activeOpacity={0.8}
             onPress={handleLogout}
           >
@@ -421,7 +423,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder }]}>
-            <View style={[styles.modalIconContainer, { backgroundColor: '#FFF2F2' }]}>
+            <View style={[styles.modalIconContainer, { backgroundColor: theme.logoutBtnBg }]}>
               <Ionicons name="log-out-outline" size={28} color="#FF4D4F" />
             </View>
             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{t.confirmLogout}</Text>

@@ -26,6 +26,7 @@ import Animated, {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Translations ─────────────────────────────────────────────────────────────
@@ -47,6 +48,8 @@ const translations = {
     bpm: 'bpm',
     km: 'Km',
     kcal: 'kcal',
+    startWalking: 'Start walking to see your route',
+    noRoute: 'No route data available',
   },
   ru: {
     dailyActivity: 'Активность',
@@ -65,6 +68,8 @@ const translations = {
     bpm: 'уд/м',
     km: 'Км',
     kcal: 'ккал',
+    startWalking: 'Начните идти, чтобы увидеть маршрут',
+    noRoute: 'Нет данных о маршруте',
   },
   uz: {
     dailyActivity: 'Faollik',
@@ -83,18 +88,40 @@ const translations = {
     bpm: 'ur/m',
     km: 'Km',
     kcal: 'kkal',
+    startWalking: 'Marshrutni ko\'rish uchun yuring',
+    noRoute: 'Marshrut ma\'lumotlari yo\'q',
   },
 };
 
+// ─── Date Translations ───────────────────────────────────────────────────────
+const dayNamesShort: any = {
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  ru: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+  uz: ['Yak', 'Dush', 'Sesh', 'Chor', 'Pay', 'Jum', 'Shan'],
+};
+
+const dayNames: any = {
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  ru: ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'],
+  uz: ['Yakshanba', 'Dushanba', 'Seshanba', 'Chorshanba', 'Payshanba', 'Juma', 'Shanba'],
+};
+
+const monthNamesShort: any = {
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  ru: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
+  uz: ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'],
+};
+
 // ─── Week Days ────────────────────────────────────────────────────────────────
-const getWeekDays = () => {
+const getWeekDays = (language: string) => {
+  const shortDays = dayNamesShort[language] || dayNamesShort['en'];
   const today = new Date();
   const days = [];
   for (let i = -2; i <= 2; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     days.push({
-      day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      day: shortDays[d.getDay()],
       date: d.getDate(),
       isToday: i === 0,
     });
@@ -189,7 +216,7 @@ const WalkingFigure = ({ color }: { color: string }) => {
 // ─── Route Map ────────────────────────────────────────────────────────────────
 type LatLng = { latitude: number; longitude: number };
 
-const RouteMap = ({ isDark, routePoints, onPress }: { isDark: boolean; routePoints: LatLng[], onPress?: () => void }) => {
+const RouteMap = ({ isDark, routePoints, onPress, t }: { isDark: boolean; routePoints: LatLng[], onPress?: () => void, t: any }) => {
   const routeColor = '#7EB93C';
   const bgColor = isDark ? '#1A2310' : '#F5F9F0';
   const textColor = isDark ? '#8a9e7a' : '#5a7a3a';
@@ -199,7 +226,7 @@ const RouteMap = ({ isDark, routePoints, onPress }: { isDark: boolean; routePoin
       <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.mapContainer, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
         <WalkingFigure color={routeColor} />
         <Text style={{ color: textColor, marginTop: 14, fontSize: 13 }}>
-          Start walking to see your route
+          {t.startWalking}
         </Text>
       </TouchableOpacity>
     );
@@ -307,6 +334,16 @@ export default function PedometerScreen() {
 
     const initPedometer = async () => {
       try {
+        // ── Get current user to build a per-user storage key ─────────────
+        // This ensures a new account ALWAYS starts at zero — no data leaks
+        // between accounts via shared AsyncStorage keys.
+        const { data: authData } = await supabase.auth.getUser();
+        const currentUserId = authData?.user?.id;
+        if (currentUserId) setUserId(currentUserId);
+        const storageKey = currentUserId
+          ? `pedometer_history_${currentUserId}`
+          : 'pedometer_history_guest';
+
         // Request Location permission
         const locPerm = await Location.getForegroundPermissionsAsync();
         if (!locPerm.granted && locPerm.canAskAgain) {
@@ -326,25 +363,16 @@ export default function PedometerScreen() {
         const useNative = isAvailable && pedGranted;
         setDebugMsg(`Perm: ${pedGranted ? 'OK' : 'Deny'} | Avail: ${isAvailable} | Mode: ${useNative ? 'Native' : 'GPS'}`);
 
-        // Load stored history
-        const historyStr = await AsyncStorage.getItem('pedometer_history');
+        // Load stored history — user-specific key so new accounts start at 0
+        const historyStr = await AsyncStorage.getItem(storageKey);
         const loadedHistory = historyStr ? JSON.parse(historyStr) : {};
         setStepHistory(loadedHistory);
 
         if (useNative) {
           // ── iOS path: native pedometer + GPS for route ──────────────────
-          let baseSteps = loadedHistory[todayStr] || 0;
-          try {
-            const start = new Date();
-            start.setHours(0, 0, 0, 0);
-            const end = new Date();
-            const past = await Pedometer.getStepCountAsync(start, end);
-            if (past && past.steps !== undefined) {
-              baseSteps = past.steps;
-            }
-          } catch (e) {
-            // fallback to stored history on error
-          }
+          // Use ONLY app's own stored history (not system HealthKit data)
+          // so a new account always starts at zero.
+          const baseSteps = loadedHistory[todayStr] || 0;
           setPastStepCount(baseSteps);
 
           pedometerSub = Pedometer.watchStepCount(result => {
@@ -376,16 +404,21 @@ export default function PedometerScreen() {
             return;
           }
 
-          // Restore today's GPS steps from history
+          // Restore today's GPS steps as the BASE.
+          // gpsStepAccumulator counts only NEW steps since app opened (starts at 0).
+          // totalTodaySteps = pastStepCount(base) + currentStepCount(new) — no double counting.
           const savedGpsSteps = loadedHistory[todayStr] || 0;
-          gpsStepAccumulator = savedGpsSteps;
-          setPastStepCount(savedGpsSteps);
-          setDebugMsg(`GPS mode | Saved steps: ${savedGpsSteps}`);
+          gpsStepAccumulator = 0;                // ← NEW steps only, starts at 0
+          setPastStepCount(savedGpsSteps);        // ← restored base
+          setDebugMsg(`GPS mode | Saved: ${savedGpsSteps} | New: 0`);
 
           // Get initial position to show on map immediately
           try {
             const initPos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-            setRoutePoints([{ latitude: initPos.coords.latitude, longitude: initPos.coords.longitude }]);
+            const initPt = { latitude: initPos.coords.latitude, longitude: initPos.coords.longitude };
+            setRoutePoints([initPt]);
+            // Set lastLocation so the first watchPositionAsync callback can calculate distance
+            lastLocation = { lat: initPt.latitude, lon: initPt.longitude, timestamp: Date.now() };
           } catch (_) { }
 
           locationSub = await Location.watchPositionAsync(
@@ -396,9 +429,11 @@ export default function PedometerScreen() {
             },
             (location) => {
               const { latitude: lat, longitude: lon } = location.coords;
-              // Android sometimes returns -1 for speed — use raw distance filtering instead
               const rawSpeed = location.coords.speed ?? -1;
               const timestamp = location.timestamp;
+
+              // Always record this position for the route map
+              setRoutePoints(prev => [...prev, { latitude: lat, longitude: lon }]);
 
               if (lastLocation) {
                 const dist = haversineDistance(lastLocation.lat, lastLocation.lon, lat, lon);
@@ -410,16 +445,15 @@ export default function PedometerScreen() {
                 const calcSpeed = timeDeltaSec > 0 ? dist / timeDeltaSec : 0;
                 const speed = rawSpeed >= 0 ? rawSpeed : calcSpeed;
 
-                // Only count if walking/running pace (0.4–8 m/s) and distance ≥ 1m
-                if (dist >= 1 && speed >= 0.4 && speed <= 8) {
+                // Only count steps if walking/running pace (0.3–7 m/s) and moved ≥ 1 m
+                if (dist >= 1 && speed >= 0.3 && speed <= 7) {
                   const newSteps = Math.round(dist / STEP_LENGTH_M);
                   gpsStepAccumulator += newSteps;
                   setCurrentStepCount(gpsStepAccumulator);
-                  setDebugMsg(`GPS | ${dist.toFixed(1)}m | ${speed.toFixed(1)}m/s | steps: ${gpsStepAccumulator}`);
+                  setDebugMsg(`GPS | ${dist.toFixed(1)}m | ${speed.toFixed(1)}m/s | +${newSteps} steps`);
                 }
-                // Always add point to route for drawing
-                setRoutePoints(prev => [...prev, { latitude: lat, longitude: lon }]);
               }
+
               lastLocation = { lat, lon, timestamp };
             }
           );
@@ -442,54 +476,53 @@ export default function PedometerScreen() {
   const totalTodaySteps = pastStepCount + currentStepCount;
 
   useEffect(() => {
-    if (totalTodaySteps > 0) {
+    if (totalTodaySteps > 0 && userId) {
+      const storageKey = `pedometer_history_${userId}`;
       setStepHistory(prev => {
         const currentVal = prev[todayStr] || 0;
         const newVal = Math.max(currentVal, totalTodaySteps);
         if (newVal !== currentVal) {
           const updated = { ...prev, [todayStr]: newVal };
-          AsyncStorage.setItem('pedometer_history', JSON.stringify(updated));
+          AsyncStorage.setItem(storageKey, JSON.stringify(updated));
           return updated;
         }
         return prev;
       });
 
       // Sync to Supabase backend
-      if (userId) {
-        const syncTimeout = setTimeout(async () => {
-          const { data } = await supabase
+      const syncTimeout = setTimeout(async () => {
+        const { data } = await supabase
+          .from('diary_entries')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('date', todayStr)
+          .eq('meal_type', 'steps_history')
+          .single();
+
+        const itemsJson = JSON.stringify(routePoints.length > 0 ? routePoints : ['steps_sync']);
+
+        if (data) {
+          await supabase
             .from('diary_entries')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('date', todayStr)
-            .eq('meal_type', 'steps_history')
-            .single();
-
-          const itemsJson = JSON.stringify(routePoints.length > 0 ? routePoints : ['steps_sync']);
-
-          if (data) {
-            await supabase
-              .from('diary_entries')
-              .update({ calories: totalTodaySteps, items: itemsJson })
-              .eq('id', data.id);
-          } else {
-            await supabase
-              .from('diary_entries')
-              .insert({
-                user_id: userId,
-                date: todayStr,
-                meal_type: 'steps_history',
-                calories: totalTodaySteps,
-                items: itemsJson
-              });
-          }
-        }, 5000); // 5 sec debounce
-        return () => clearTimeout(syncTimeout);
-      }
+            .update({ calories: totalTodaySteps, items: itemsJson })
+            .eq('id', data.id);
+        } else {
+          await supabase
+            .from('diary_entries')
+            .insert({
+              user_id: userId,
+              date: todayStr,
+              meal_type: 'steps_history',
+              calories: totalTodaySteps,
+              items: itemsJson
+            });
+        }
+      }, 5000); // 5 sec debounce
+      return () => clearTimeout(syncTimeout);
     }
   }, [totalTodaySteps, todayStr, userId, routePoints]);
 
-  // 2b. Fetch historical steps from Supabase backend
+  // 2b. Fetch historical steps from Supabase backend (source of truth / cross-device sync)
   useEffect(() => {
     if (!userId) return;
     const fetchStepHistory = async () => {
@@ -502,19 +535,28 @@ export default function PedometerScreen() {
       if (data && !error) {
         // Load today's route points
         const todayData = data.find((row: any) => row.date === todayStr);
-        if (todayData && todayData.items) {
-          try {
-            const pts = JSON.parse(todayData.items);
-            if (Array.isArray(pts) && pts.length > 0 && pts[0].latitude) {
-              setRoutePoints(prev => {
-                // To avoid duplicate merging, check if we already have these
-                if (prev.length > 0 && prev[0].latitude === pts[0].latitude) return prev;
-                return [...pts, ...prev];
-              });
-            }
-          } catch (e) { }
+
+        if (todayData) {
+          // If Supabase has more steps for today than AsyncStorage loaded,
+          // update pastStepCount so totalTodaySteps reflects the real value.
+          // This handles: app restart mid-day, or cross-device sync.
+          const supabaseToday = todayData.calories || 0;
+          setPastStepCount(prev => Math.max(prev, supabaseToday));
+
+          if (todayData.items) {
+            try {
+              const pts = JSON.parse(todayData.items);
+              if (Array.isArray(pts) && pts.length > 0 && pts[0].latitude) {
+                setRoutePoints(prev => {
+                  if (prev.length > 0 && prev[0].latitude === pts[0].latitude) return prev;
+                  return [...pts, ...prev];
+                });
+              }
+            } catch (e) { }
+          }
         }
 
+        // Merge all historical days into local stepHistory
         setStepHistory(prev => {
           const newHistory = { ...prev };
           let changed = false;
@@ -525,7 +567,7 @@ export default function PedometerScreen() {
             }
           });
           if (changed) {
-            AsyncStorage.setItem('pedometer_history', JSON.stringify(newHistory));
+            AsyncStorage.setItem(`pedometer_history_${userId}`, JSON.stringify(newHistory));
             return newHistory;
           }
           return prev;
@@ -535,14 +577,7 @@ export default function PedometerScreen() {
     fetchStepHistory();
   }, [userId, todayStr]);
 
-  // 3. Fetch calories eaten from Supabase
-  useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) setUserId(data.user.id);
-    };
-    getUser();
-  }, []);
+  // 3. Fetch calories eaten from Supabase (userId already set in pedometer init)
 
   useEffect(() => {
     if (!userId) return;
@@ -565,6 +600,11 @@ export default function PedometerScreen() {
   const systemColorScheme = useColorScheme();
   const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
   const t = translations[language as keyof typeof translations] || translations.en;
+  const [weekDays, setWeekDays] = useState(() => getWeekDays(language));
+
+  useEffect(() => {
+    setWeekDays(getWeekDays(language));
+  }, [language]);
 
   const theme = {
     background: isDark ? '#0F140A' : '#F7FAF3',
@@ -576,7 +616,6 @@ export default function PedometerScreen() {
     pillBackground: isDark ? '#23321A' : '#F5FAF0',
   };
 
-  const weekDays = getWeekDays();
   const modes = [t.day, t.week, t.month];
 
   // Helper to sum steps over a period
@@ -633,7 +672,11 @@ export default function PedometerScreen() {
           <View style={styles.headerRow}>
             <View>
               <Text style={[styles.headerDate, { color: theme.textMuted }]}>
-                {selectedDateObj.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
+                {(() => {
+                  const dNames = dayNames[language] || dayNames['en'];
+                  const mNames = monthNamesShort[language] || monthNamesShort['en'];
+                  return `${dNames[selectedDateObj.getDay()]}, ${selectedDateObj.getDate()} ${mNames[selectedDateObj.getMonth()]}, ${selectedDateObj.getFullYear()}`;
+                })()}
               </Text>
               <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{t.dailyActivity}</Text>
             </View>
@@ -721,7 +764,7 @@ export default function PedometerScreen() {
           entering={FadeInDown.duration(400).delay(240)}
           style={[styles.card, { backgroundColor: theme.cardBackground, borderColor: theme.cardBorder, overflow: 'hidden', padding: 0 }]}
         >
-          <RouteMap isDark={isDark} routePoints={routePoints} onPress={() => setIsMapFullScreen(true)} />
+          <RouteMap isDark={isDark} routePoints={routePoints} onPress={() => setIsMapFullScreen(true)} t={t} />
         </Animated.View>
 
         {/* ── Stats Grid (2×2) ── */}
@@ -810,7 +853,7 @@ export default function PedometerScreen() {
             </MapView>
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: theme.textMuted }}>No route data available</Text>
+              <Text style={{ color: theme.textMuted }}>{t.noRoute}</Text>
             </View>
           )}
           <View style={{ position: 'absolute', top: Math.max(insets.top + 8, 20), right: 16, zIndex: 10 }}>
