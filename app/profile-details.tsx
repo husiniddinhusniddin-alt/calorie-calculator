@@ -199,7 +199,7 @@ export default function ProfileDetailsScreen() {
                 ) : (
                   <Text style={styles.avatarText}>AG</Text>
                 )}
-                <View style={styles.avatarEditBadge}>
+                <View style={[styles.avatarEditBadge, { borderColor: theme.cardBackground }]}>
                   <Ionicons name="camera" size={14} color="#FFFFFF" />
                 </View>
               </TouchableOpacity>
@@ -218,7 +218,7 @@ export default function ProfileDetailsScreen() {
                 outlineColor={theme.inputOutline}
                 textColor={theme.inputText}
                 theme={{ colors: { background: theme.inputBackground } }}
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.inputBackground }]}
               />
 
               <TextInput
@@ -232,7 +232,7 @@ export default function ProfileDetailsScreen() {
                 outlineColor={theme.inputOutline}
                 textColor={theme.inputText}
                 theme={{ colors: { background: theme.inputBackground } }}
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.inputBackground }]}
               />
 
               <TextInput
@@ -245,7 +245,7 @@ export default function ProfileDetailsScreen() {
                 outlineColor={theme.inputOutline}
                 textColor={theme.inputText}
                 theme={{ colors: { background: theme.inputBackground } }}
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.inputBackground }]}
               />
 
               <TextInput
@@ -258,7 +258,7 @@ export default function ProfileDetailsScreen() {
                 outlineColor={theme.inputOutline}
                 textColor={theme.inputText}
                 theme={{ colors: { background: theme.inputBackground } }}
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.inputBackground }]}
               />
             </View>
 
@@ -277,7 +277,7 @@ export default function ProfileDetailsScreen() {
                     outlineColor={theme.inputOutline}
                     textColor={theme.inputText}
                     theme={{ colors: { background: theme.inputBackground } }}
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: theme.inputBackground }]}
                   />
                 </View>
                 <View style={{ flex: 1, marginLeft: 8 }}>
@@ -291,7 +291,7 @@ export default function ProfileDetailsScreen() {
                     outlineColor={theme.inputOutline}
                     textColor={theme.inputText}
                     theme={{ colors: { background: theme.inputBackground } }}
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: theme.inputBackground }]}
                   />
                 </View>
               </View>
@@ -307,7 +307,7 @@ export default function ProfileDetailsScreen() {
                     outlineColor={theme.inputOutline}
                     textColor={theme.inputText}
                     theme={{ colors: { background: theme.inputBackground } }}
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: theme.inputBackground }]}
                   />
                 </View>
               </View>
