@@ -43,6 +43,7 @@ const translations = {
 };
 
 import { supabase } from '@/constants/supabase';
+import CustomImageCropper from '@/components/CustomImageCropper';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -79,6 +80,9 @@ export default function ProfileScreen() {
   const [height, setHeight] = useState<number | null>(MockStore.height);
   const [calorieStreak, setCalorieStreak] = useState<number>(MockStore.calorieStreak);
   const [waterStreak, setWaterStreak] = useState<number>(MockStore.waterStreak);
+
+  const [cropImageUri, setCropImageUri] = useState<string | null>(null);
+  const [isCropperVisible, setIsCropperVisible] = useState(false);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -231,14 +235,20 @@ export default function ProfileScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      allowsEditing: false,
+      quality: 1,
     });
 
     if (!result.canceled && result.assets && result.assets[0].uri) {
-      const selectedUri = result.assets[0].uri;
-      MockStore.update({ profileImage: selectedUri });
+      setCropImageUri(result.assets[0].uri);
+      setIsCropperVisible(true);
+    }
+  };
+
+  const handleCropComplete = async (croppedUri: string) => {
+    setIsCropperVisible(false);
+    const selectedUri = croppedUri;
+    MockStore.update({ profileImage: selectedUri });
 
       // Update image url in Supabase profiles table
       try {
@@ -251,7 +261,6 @@ export default function ProfileScreen() {
       } catch (err) {
         console.warn('Failed to update avatar in DB:', err);
       }
-    }
   };
 
   // Goal calculations
@@ -261,6 +270,12 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      <CustomImageCropper
+        visible={isCropperVisible}
+        imageUri={cropImageUri}
+        onCancel={() => setIsCropperVisible(false)}
+        onCrop={handleCropComplete}
+      />
       <StatusBar style={isDark ? "light" : "dark"} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -281,7 +296,7 @@ export default function ProfileScreen() {
               activeOpacity={0.8}
             >
               {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+                <Image source={{ uri: profileImage }} style={styles.avatarImage} resizeMode="cover" />
               ) : (
                 <Text style={styles.avatarText}>AG</Text>
               )}

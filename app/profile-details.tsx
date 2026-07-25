@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import { MockStore } from '@/constants/store';
 import { supabase } from '@/constants/supabase';
+import CustomImageCropper from '@/components/CustomImageCropper';
 
 const translations = {
   en: {
@@ -110,6 +111,9 @@ export default function ProfileDetailsScreen() {
   const [profileImage, setProfileImage] = useState<string | null>(MockStore.profileImage);
   // Stores the raw storage path (e.g. userId/123.jpg) used when saving to DB
   const [profileImagePath, setProfileImagePath] = useState<string | null>(null);
+
+  const [cropImageUri, setCropImageUri] = useState<string | null>(null);
+  const [isCropperVisible, setIsCropperVisible] = useState(false);
 
   const [originalValues, setOriginalValues] = useState({
     name: MockStore.name || 'User',
@@ -254,13 +258,19 @@ export default function ProfileDetailsScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      allowsEditing: false,
+      quality: 1,
     });
 
     if (!result.canceled && result.assets && result.assets[0].uri) {
-      const localUri = result.assets[0].uri;
+      setCropImageUri(result.assets[0].uri);
+      setIsCropperVisible(true);
+    }
+  };
+
+  const handleCropComplete = async (croppedUri: string) => {
+    setIsCropperVisible(false);
+    const localUri = croppedUri;
 
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -296,7 +306,6 @@ export default function ProfileDetailsScreen() {
         console.warn('Failed to upload avatar:', err);
         alert('Image upload failed. Please try again.');
       }
-    }
   };
 
   const hasChanges = 
@@ -311,6 +320,12 @@ export default function ProfileDetailsScreen() {
 
   return (
     <PaperProvider>
+      <CustomImageCropper
+        visible={isCropperVisible}
+        imageUri={cropImageUri}
+        onCancel={() => setIsCropperVisible(false)}
+        onCrop={handleCropComplete}
+      />
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <StatusBar style={isDark ? "light" : "dark"} />
         <KeyboardAvoidingView
@@ -343,7 +358,7 @@ export default function ProfileDetailsScreen() {
                 activeOpacity={0.8}
               >
                 {profileImage ? (
-                  <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+                  <Image source={{ uri: profileImage }} style={styles.avatarImage} resizeMode="cover" />
                 ) : (
                   <Text style={styles.avatarText}>AG</Text>
                 )}
