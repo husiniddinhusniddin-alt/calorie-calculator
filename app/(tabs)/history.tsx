@@ -2,6 +2,7 @@ import { MockStore } from '@/constants/store';
 import { supabase } from '@/constants/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { translateFoodNames } from '@/utils/translator';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
@@ -180,6 +181,24 @@ export default function HistoryScreen() {
       };
     });
 
+    const foodNamesToTranslate = new Set<string>();
+
+    if (data) {
+      data.forEach((entry: any) => {
+        if (typeof entry.items === 'string') {
+          try {
+            const parsed = JSON.parse(entry.items);
+            parsed.forEach((it: any) => {
+              const name = typeof it === 'object' ? (it.title || it.name) : it;
+              if (name && typeof name === 'string') foodNamesToTranslate.add(name);
+            });
+          } catch (e) {}
+        }
+      });
+    }
+
+    const translationDict = await translateFoodNames(Array.from(foodNamesToTranslate), language);
+
     if (data) {
       data.forEach((entry: any) => {
         const day = grouped[entry.date];
@@ -188,7 +207,7 @@ export default function HistoryScreen() {
           
           let icon = '🍽️';
           if (entry.meal_type === 'breakfast') icon = '🍳';
-          if (entry.meal_type === 'lunch') icon = '🥗';
+          if (entry.meal_type === 'lunch') icon = '🥗';h
           if (entry.meal_type === 'dinner') icon = '🥩';
           if (entry.meal_type === 'snack') icon = '🍎';
 
@@ -196,7 +215,10 @@ export default function HistoryScreen() {
           if (typeof entry.items === 'string') {
             try {
               const parsed = JSON.parse(entry.items);
-              itemsDesc = parsed.map((it: any) => it.name).join(', ');
+              itemsDesc = parsed.map((it: any) => {
+                const name = typeof it === 'object' ? (it.title || it.name) : it;
+                return typeof name === 'string' ? (translationDict[name] || name) : name;
+              }).filter(Boolean).join(', ');
             } catch (e) {}
           }
 

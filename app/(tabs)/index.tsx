@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
+import { translateFoodNames } from '@/utils/translator';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -22,7 +23,30 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Calendar } from 'react-native-calendars';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
+
+LocaleConfig.locales['ru'] = {
+  monthNames: ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'],
+  monthNamesShort: ['Янв.','Февр.','Март','Апр.','Май','Июнь','Июль','Авг.','Сент.','Окт.','Нояб.','Дек.'],
+  dayNames: ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'],
+  dayNamesShort: ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'],
+  today: 'Сегодня'
+};
+LocaleConfig.locales['uz'] = {
+  monthNames: ['Yanvar','Fevral','Mart','Aprel','May','Iyun','Iyul','Avgust','Sentabr','Oktabr','Noyabr','Dekabr'],
+  monthNamesShort: ['Yan','Fev','Mar','Apr','May','Iyun','Iyul','Avg','Sen','Okt','Noy','Dek'],
+  dayNames: ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'],
+  dayNamesShort: ['Yak','Dush','Sesh','Chor','Pay','Jum','Shan'],
+  today: 'Bugun'
+};
+
+const UI_DAYS_UZ = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'];
+const UI_DAYS_RU = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+const UI_DAYS_EN = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+const UI_MONTHS_UZ = ['Yan','Fev','Mar','Apr','May','Iyun','Iyul','Avg','Sen','Okt','Noy','Dek'];
+const UI_MONTHS_RU = ['янв.','февр.','мар.','апр.','мая','июн.','июл.','авг.','сент.','окт.','нояб.','дек.'];
+const UI_MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 import Animated, { Easing, FadeInDown, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -449,6 +473,9 @@ export default function DiaryScreen() {
   const systemColorScheme = useColorScheme();
   const isDark = appTheme === 'system' ? systemColorScheme === 'dark' : appTheme === 'dark';
   const t = translations[language] || translations.en;
+  
+  // Set calendar locale
+  LocaleConfig.defaultLocale = language === 'ru' || language === 'uz' ? language : 'en';
 
   const theme = {
     background: isDark ? '#0F140A' : '#F7FAF3',
@@ -529,6 +556,7 @@ export default function DiaryScreen() {
   useEffect(() => {
     if (!userId) return;
     const fetchMeals = async () => {
+      setIsFetching(true);
       const { data, error } = await supabase
         .from('diary_entries')
         .select('*')
@@ -543,18 +571,36 @@ export default function DiaryScreen() {
       ];
 
       if (data && !error) {
+        const foodNamesToTranslate = new Set<string>();
+        data.forEach((d: any) => {
+          const items = typeof d.items === 'string' ? JSON.parse(d.items) : (d.items || []);
+          items.forEach((it: any) => {
+             const name = typeof it === 'object' ? (it.title || it.name) : it;
+             if (name && typeof name === 'string') foodNamesToTranslate.add(name);
+          });
+        });
+        
+        const translationDict = await translateFoodNames(Array.from(foodNamesToTranslate), language);
+
         const updatedMeals = baseMeals.map(emptyMeal => {
           const found = data.find((d: any) => d.meal_type === emptyMeal.id);
           if (found) {
             const items = typeof found.items === 'string' ? JSON.parse(found.items) : (found.items || []);
+            const translatedItems = items.map((it: any) => {
+              if (typeof it === 'object') {
+                const name = it.title || it.name;
+                return { ...it, title: typeof name === 'string' ? (translationDict[name] || name) : name };
+              }
+              return typeof it === 'string' ? (translationDict[it] || it) : it;
+            });
             return {
               ...emptyMeal,
               calories: found.calories || 0,
               carbs: found.carbs || 0,
               protein: found.protein || 0,
               fat: found.fat || 0,
-              items: items,
-              empty: items.length === 0 && (found.calories || 0) === 0
+              items: translatedItems,
+              empty: translatedItems.length === 0 && (found.calories || 0) === 0
             };
           }
           return emptyMeal;
@@ -568,29 +614,33 @@ export default function DiaryScreen() {
         setMeals(baseMeals);
         setTotalCarbs(0); setTotalProtein(0); setTotalFat(0);
       }
+      setIsFetching(false);
     };
     fetchMeals();
-  }, [userId, selectedDate]);
+  }, [userId, selectedDate, language]);
 
   const dateObj = new Date(selectedDate);
-  const locale = language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-US';
-  const formattedDayName = dateObj.toLocaleDateString(locale, { weekday: 'long' });
-  const formattedDate = dateObj.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  const dayIndex = dateObj.getDay();
+  const monthIndex = dateObj.getMonth();
+  const year = dateObj.getFullYear();
+  const day = dateObj.getDate();
+
+  let formattedDayName = UI_DAYS_EN[dayIndex];
+  let formattedDate = `${UI_MONTHS_EN[monthIndex]} ${day}, ${year}`;
+
+  if (language === 'uz') {
+    formattedDayName = UI_DAYS_UZ[dayIndex];
+    formattedDate = `${day}-${UI_MONTHS_UZ[monthIndex]}, ${year}`;
+  } else if (language === 'ru') {
+    formattedDayName = UI_DAYS_RU[dayIndex];
+    formattedDate = `${day} ${UI_MONTHS_RU[monthIndex]} ${year} г.`;
+  }
 
   const [activeTrendTab, setActiveTrendTab] = useState<'day' | 'week' | 'month'>('day');
   const [isFetching, setIsFetching] = useState(true);
+  const [isFetchingTrends, setIsFetchingTrends] = useState(true);
 
-  useEffect(() => {
-    if (!userId) return;
-    setIsFetching(true);
-    const fetchAll = async () => {
-      // Fake delay to ensure a smooth, visible loading screen during date switch
-      await new Promise(res => setTimeout(res, 500));
-      setIsFetching(false);
-    };
-    fetchAll();
-  }, [userId, selectedDate]);
-
+  // Real trend chart data from Supabase
   const [tempGoal, setTempGoal] = useState(dailyGoal.toString());
   const [tempCarbs, setTempCarbs] = useState(carbsGoal.toString());
   const [tempProtein, setTempProtein] = useState(proteinGoal.toString());
@@ -610,6 +660,7 @@ export default function DiaryScreen() {
   useEffect(() => {
     if (!userId) return;
     const fetchTrendData = async () => {
+      setIsFetchingTrends(true);
       const today = new Date();
       let rows: { label: string; value: number }[] = [];
       let maxVal = 2000;
@@ -647,7 +698,10 @@ export default function DiaryScreen() {
           const d = new Date(today);
           d.setDate(today.getDate() - i);
           const dateStr = d.toISOString().split('T')[0];
-          const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase().slice(0, 3);
+          
+          let dayLabel = UI_DAYS_EN[d.getDay()].substring(0, 3).toUpperCase();
+          if (language === 'uz') dayLabel = UI_DAYS_UZ[d.getDay()].substring(0, 3).toUpperCase();
+          if (language === 'ru') dayLabel = UI_DAYS_RU[d.getDay()].substring(0, 3).toUpperCase();
 
           const total = (data || [])
             .filter((r: any) => r.date === dateStr)
@@ -693,6 +747,7 @@ export default function DiaryScreen() {
 
       setTrendChartData(rows);
       setTrendMax(maxVal);
+      setIsFetchingTrends(false);
     };
     fetchTrendData();
   }, [userId, activeTrendTab, selectedDate]);
@@ -768,10 +823,11 @@ export default function DiaryScreen() {
   const localizedMeals = meals.map(meal => ({
     ...meal,
     label: t[meal.id as keyof typeof t] || meal.label,
-    items: meal.items.map((item: string) => {
-      if (item === 'Oatmeal with fruits and nuts') return t.oatmealText;
-      if (item === 'Chops with potatoes') return t.chopsText;
-      if (item === 'AI Identified Food') return t.aiIdentifiedFood;
+    items: meal.items.map((item: any) => {
+      const itemTitle = typeof item === 'object' && item !== null ? (item.title || item.name) : item;
+      if (itemTitle === 'Oatmeal with fruits and nuts') return typeof item === 'object' ? { ...item, title: t.oatmealText } : t.oatmealText;
+      if (itemTitle === 'Chops with potatoes') return typeof item === 'object' ? { ...item, title: t.chopsText } : t.chopsText;
+      if (itemTitle === 'AI Identified Food') return typeof item === 'object' ? { ...item, title: t.aiIdentifiedFood } : t.aiIdentifiedFood;
       return item;
     })
   }));
